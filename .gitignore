@@ -9,3 +9,5 @@ node_modules
 .DS_Store
 client/yarn.lock
 target-xA/*
+.next
+client/.next
