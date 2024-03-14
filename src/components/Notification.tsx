@@ -67,8 +67,15 @@ const Notification = ({ type, message, description, txid, onHide }) => {
 		<div
 			className={`max-w-sm w-full bg-bkg-1 shadow-lg rounded-md mt-2 pointer-events-auto ring-1 ring-black ring-opacity-5 mx-4 mb-4 overflow-hidden`}
 		>
-			<div
+			{/* <div
 				className={`p-4 rounded-md bg-gradient-to-r from-[#104354] from-10% via-[#1e6177] via-30% to-[#095670] to-90%`}
+			> */}
+			<div
+				className={`p-4 rounded-md ${
+					type === 'error'
+						? 'bg-gradient-to-r from-[#3c1111] to-red-600'
+						: 'bg-gradient-to-r from-[#104354] from-10% via-[#1e6177] via-30% to-[#095670] to-90%'
+				}`}
 			>
 				<div className={`flex items-center`}>
 					<div className={`flex-shrink-0`}>

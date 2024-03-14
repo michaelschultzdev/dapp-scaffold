@@ -1,0 +1,362 @@
+{
+	"version": "0.1.0",
+	"name": "token_locker",
+	"instructions": [
+		{
+			"name": "initialize",
+			"accounts": [
+				{
+					"name": "baseAccount",
+					"isMut": true,
+					"isSigner": true
+				},
+				{
+					"name": "owner",
+					"isMut": true,
+					"isSigner": true
+				},
+				{
+					"name": "systemProgram",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "feeAccount",
+					"isMut": false,
+					"isSigner": false,
+					"docs": ["CHECK we don't read and write this"]
+				}
+			],
+			"args": [
+				{
+					"name": "feeRate",
+					"type": "u64"
+				},
+				{
+					"name": "feeAmount",
+					"type": "u64"
+				}
+			]
+		},
+		{
+			"name": "createUserStats",
+			"accounts": [
+				{
+					"name": "user",
+					"isMut": true,
+					"isSigner": true
+				},
+				{
+					"name": "userStats",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "systemProgram",
+					"isMut": false,
+					"isSigner": false
+				}
+			],
+			"args": []
+		},
+		{
+			"name": "createVesting",
+			"accounts": [
+				{
+					"name": "user",
+					"isMut": true,
+					"isSigner": true
+				},
+				{
+					"name": "userToken",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "recipient",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "recipientToken",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "feeToken",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "mint",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "vault",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "clock",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "tokenProgram",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "associatedTokenProgram",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "baseAccount",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "feeAccount",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "userStats",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "systemProgram",
+					"isMut": false,
+					"isSigner": false
+				}
+			],
+			"args": [
+				{
+					"name": "totalAmount",
+					"type": "u64"
+				},
+				{
+					"name": "startTs",
+					"type": "u64"
+				},
+				{
+					"name": "endTs",
+					"type": "u64"
+				},
+				{
+					"name": "withSol",
+					"type": "bool"
+				},
+				{
+					"name": "vaultBump",
+					"type": "u8"
+				}
+			]
+		},
+		{
+			"name": "unlock",
+			"accounts": [
+				{
+					"name": "user",
+					"isMut": true,
+					"isSigner": true
+				},
+				{
+					"name": "recipientToken",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "vault",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "mint",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "userStats",
+					"isMut": true,
+					"isSigner": false
+				},
+				{
+					"name": "systemProgram",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "tokenProgram",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "clock",
+					"isMut": false,
+					"isSigner": false
+				},
+				{
+					"name": "baseAccount",
+					"isMut": true,
+					"isSigner": false
+				}
+			],
+			"args": [
+				{
+					"name": "id",
+					"type": "u8"
+				},
+				{
+					"name": "amount",
+					"type": "u64"
+				}
+			]
+		}
+	],
+	"accounts": [
+		{
+			"name": "UserStats",
+			"type": {
+				"kind": "struct",
+				"fields": [
+					{
+						"name": "totalVesting",
+						"type": "u64"
+					},
+					{
+						"name": "vestList",
+						"type": {
+							"vec": {
+								"defined": "Vesting"
+							}
+						}
+					},
+					{
+						"name": "bump",
+						"type": "u8"
+					}
+				]
+			}
+		},
+		{
+			"name": "BaseAccount",
+			"type": {
+				"kind": "struct",
+				"fields": [
+					{
+						"name": "feeAccount",
+						"type": "publicKey"
+					},
+					{
+						"name": "ownerAccount",
+						"type": "publicKey"
+					},
+					{
+						"name": "feeAmount",
+						"type": "u64"
+					},
+					{
+						"name": "feeRate",
+						"type": "u64"
+					},
+					{
+						"name": "isInitialized",
+						"type": "bool"
+					},
+					{
+						"name": "bump",
+						"type": "u8"
+					}
+				]
+			}
+		}
+	],
+	"types": [
+		{
+			"name": "Vesting",
+			"type": {
+				"kind": "struct",
+				"fields": [
+					{
+						"name": "withdrawnAmount",
+						"type": "u64"
+					},
+					{
+						"name": "remainingAmount",
+						"type": "u64"
+					},
+					{
+						"name": "totalAmount",
+						"type": "u64"
+					},
+					{
+						"name": "granter",
+						"type": "publicKey"
+					},
+					{
+						"name": "granterToken",
+						"type": "publicKey"
+					},
+					{
+						"name": "recipient",
+						"type": "publicKey"
+					},
+					{
+						"name": "recipientToken",
+						"type": "publicKey"
+					},
+					{
+						"name": "mint",
+						"type": "publicKey"
+					},
+					{
+						"name": "vault",
+						"type": "publicKey"
+					},
+					{
+						"name": "startTs",
+						"type": "u64"
+					},
+					{
+						"name": "endTs",
+						"type": "u64"
+					}
+				]
+			}
+		}
+	],
+	"errors": [
+		{
+			"code": 6000,
+			"name": "InvalidSchedule",
+			"msg": "Invalid vesting schedule given."
+		},
+		{
+			"code": 6001,
+			"name": "InvalidAssociatedTokenAddress",
+			"msg": "Invalid associated token address. Did you provide the correct address?"
+		},
+		{
+			"code": 6002,
+			"name": "InvalidFund",
+			"msg": "Insufficient fund"
+		},
+		{
+			"code": 6003,
+			"name": "InvalidUnlockTime",
+			"msg": "Invalid unlock time"
+		},
+		{
+			"code": 6004,
+			"name": "InvalidUnlockAmount",
+			"msg": "Invalid unlock amount"
+		}
+	],
+	"metadata": {
+		"address": "HoCqnWYa2tTRzyfosgQz7FzGkoJYQSWJrzKyBheZM8dw"
+	}
+}

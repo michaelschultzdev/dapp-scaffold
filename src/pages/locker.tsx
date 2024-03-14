@@ -1,15 +1,18 @@
 import type { NextPage } from 'next';
 import Head from 'next/head';
-import { BasicsView } from '../views';
+import { LockerView } from '../views';
 
-const Locker: NextPage = (props) => {
+export const Locker: NextPage = (props) => {
 	return (
 		<div>
 			<Head>
-				<title>Solana Scaffold</title>
-				<meta name='description' content='Basic Functionality' />
+				<title>SolFi Locker</title>
+				<meta
+					name='description'
+					content='Locker Utility – Lock your Solana SPL LP or Tokens today!'
+				/>
 			</Head>
-			<BasicsView />
+			<LockerView />
 		</div>
 	);
 };

@@ -27,7 +27,7 @@ export const ContentContainer: React.FC<Props> = ({ children }) => {
 						</Text>
 					</li>
 					<li className='uppercase'>
-						<NavElement label='Home' href='/' className='text-3xl' />
+						<NavElement label='Home' href='/' />
 					</li>
 					<li className='uppercase'>
 						<NavElement label='Basics' href='/basics' />
