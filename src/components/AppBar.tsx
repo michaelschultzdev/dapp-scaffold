@@ -60,29 +60,29 @@ export const AppBar: React.FC = () => {
 					>
 						<div className='HAMBURGER-ICON space-y-2.5 ml-5'>
 							<div
-								className={`h-0.5 w-8 bg-purple-600 ${
+								className={`h-0.5 w-8 bg-[#1e6177] ${
 									isNavOpen ? 'hidden' : ''
 								}`}
 							/>
 							<div
-								className={`h-0.5 w-8 bg-purple-600 ${
+								className={`h-0.5 w-8 bg-[#1e6177] ${
 									isNavOpen ? 'hidden' : ''
 								}`}
 							/>
 							<div
-								className={`h-0.5 w-8 bg-purple-600 ${
+								className={`h-0.5 w-8 bg-[#1e6177] ${
 									isNavOpen ? 'hidden' : ''
 								}`}
 							/>
 						</div>
 						<div
-							className={`absolute block h-0.5 w-8 animate-pulse bg-purple-600 ${
+							className={`absolute block h-0.5 w-8 animate-pulse bg-[#1e6177] ${
 								isNavOpen ? '' : 'hidden'
 							}`}
 							style={{ transform: 'rotate(45deg)' }}
 						></div>
 						<div
-							className={`absolute block h-0.5 w-8 animate-pulse bg-purple-600 ${
+							className={`absolute block h-0.5 w-8 animate-pulse bg-[#1e6177] ${
 								isNavOpen ? '' : 'hidden'
 							}`}
 							style={{ transform: 'rotate(135deg)' }}
