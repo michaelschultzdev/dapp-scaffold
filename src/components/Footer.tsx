@@ -5,7 +5,7 @@ import Logo from '../assets/template-images/logo-trans.png';
 
 export const Footer: FC = () => {
 	return (
-		<div className='flex'>
+		<div className='flex mt-20'>
 			<footer className='border-t-2 border-[#104354] bg-[#081316] hover:text-white w-screen'>
 				<div className='ml-12 py-12 mr-12'>
 					<div className='grid grid-cols-2 md:grid-cols-6 gap-2 md:gap-8 md:space-x-12 relative'>

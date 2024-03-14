@@ -12,6 +12,7 @@ const Home: NextPage = (props) => {
 					content='SoliDefi ($SOLFI) Solana Token and Liquidity Pool LP Locker, with APY rewards'
 				/>
 			</Head>
+
 			<HomeView />
 		</div>
 	);

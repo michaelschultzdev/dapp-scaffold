@@ -46,7 +46,7 @@ export const HomeView: FC = ({}) => {
 						APY!
 					</p>
 				</h4>
-				<div className='mx-auto flex gap-10 bg-white/5 px-6 ring-1 ring-white/10 sm:rounded-3xl lg:mx-0 lg:max-w-none sm:flex-col lg:items-center lg:pt-16 lg:pb-20 xl:gap-x-20 xl:px-20 mb-20'>
+				<div className='mx-auto flex gap-10 bg-white/5 px-6 ring-1 ring-white/10 sm:rounded-3xl lg:mx-0 lg:max-w-none sm:flex-col lg:items-center lg:pt-16 lg:pb-20 xl:gap-x-20 xl:px-20'>
 					<h2 className='text-3xl font-bold tracking-tight text-white sm:text-4xl'>
 						The DApp Is Now In Beta!
 					</h2>

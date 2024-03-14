@@ -30,3 +30,7 @@ a {
 .wallet-adapter-button:not([disabled]):hover {
 	background-color: #062a36;
 }
+
+.items-center.drawer-content.flex.flex-col.justify-between > div {
+	width: 100%;
+}
