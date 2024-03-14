@@ -1,0 +1,17 @@
+[features]
+seeds = false
+skip-lint = false
+[programs.localnet]
+token_locker = "F7HAoSqFmeyMEHoR7FjZpuo4bHCU9UXF8W5Ndzhd39Qy"
+[programs.devnet]
+token_locker = "F7HAoSqFmeyMEHoR7FjZpuo4bHCU9UXF8W5Ndzhd39Qy"
+
+[registry]
+url = "https://api.apr.dev"
+
+[provider]
+cluster = "devnet"
+wallet = "/Users/primary/keydev/id.json"
+
+[scripts]
+test = "yarn run ts-mocha -p ./tsconfig.json -t 1000000 tests/**/*.ts"

@@ -1,0 +1,11 @@
+0x0 means you're attempting to initialize an already initialized account. What's happening here is that because your PDAs have only constant seeds, the same address is generated for them on each run of the test.
+https://solana.stackexchange.com/questions/4385/stuck-at-error-failed-to-send-transaction-transaction-simulation-failed-error
+
+solana-test-validator -r resets the validator. You can also do this manually by deleting the test-ledger file. I wish I could give you a good answer to the second question. I'd recomment viewing the program logs though for more context on errors. An easy way to do this is solana logs or just try..catch in javascript 
+– 
+
+nano /Users/primary/.config/solana/cli/config.yml
+
+Fee receiver: 2pXQtUJmQv3VnpriUFNbhK5fcSAR1jDrKz9uPENkvraP has 0.2 SOL, fees should reflect new amounts
+
+https://siws.web3auth.io/implementfrontend-react

@@ -52,6 +52,12 @@ export default function LockerMain({ props }) {
 	const network = networkConfiguration;
 	const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 
+	const provider = anchor.AnchorProvider.env();
+
+	anchor.setProvider(provider);
+
+	const program = anchor.workspace.TokenLocker;
+
 	// console.log('network', network);
 	// console.log('endpoint', endpoint);
 
@@ -66,27 +72,10 @@ export default function LockerMain({ props }) {
 		);
 		return provider;
 	};
-
-	// // Reusable details
-	// const connection = useConnection();
 	const wallet = useWallet();
-	const provider = getProvider();
+	// const provider = getProvider();
 	const { connection } = useConnection();
-
-	useEffect(() => {
-		// console.log('wallet', wallet);
-		if (wallet.connected && wallet.publicKey) {
-			setWalletAddress(wallet.publicKey);
-		}
-	}, [wallet]);
-
-	// console.log('Time to get everything straight:')
-	// const networkA = clusterApiUrl("devnet")
-	// console.log(networkA)
-	// const networkB = new Connection(network, opts.preflightCommitment);
-	// console.log
-
-	// console.log('connected?', connected);
+	const user = wallet;
 
 	useEffect(() => {
 		if (publicKey) {
@@ -94,29 +83,7 @@ export default function LockerMain({ props }) {
 		}
 	}, [publicKey]);
 
-	useEffect(() => {
-		async function checkConnection() {
-			if (publicKey === null) {
-				notify({
-					type: 'error',
-					message: 'Wallet needs to be connected to use the SolFi Locker.',
-				});
-			}
-		}
-		checkConnection();
-	}, [isConnecting]);
-
-	// console.log(publicKey);
-	// notify({ type: 'error', message: `Transaction failed!`, description: error?.message, txid: signature });
-
-	const user = provider.wallet;
-	// const wallet = publicKey;
-	// const provider = useConnection();
-	//
-	// console.log('prov', provider);
-
-	// const sysProg = anchor.web3.SystemProgram.programId;
-
+	// const program = new Program(idl, programID, provider);
 	const baseAccount = anchor.web3.Keypair.generate();
 	const feeAccount = new PublicKey(
 		'FX9yNH3yRMUvmW5UASJ7nsQpnXvEhHF3i2xMBppwuU7t'
@@ -127,13 +94,8 @@ export default function LockerMain({ props }) {
 		'Bkj7fVXttCm2A5P53z2K5u16jb8HTxRb5LzQhhSakVfb'
 	);
 
-	// console.log('base account', recipient.toString());
-
 	const start = new BN(+new Date('2024-03-12T01:24:00'));
 	const end = new BN(+new Date('2024-03-14T12:24:00'));
-	const program = new Program(idl, programID, provider);
-
-	// return <></>;
 
 	// Change this to the field where they define their token
 	let mint = new PublicKey('H5mWy9iYTPWSB1mbSnMKoYdGggbH1QrUPkgqFJQabqbX');
@@ -151,44 +113,36 @@ export default function LockerMain({ props }) {
 	async function beforeRun() {
 		if (!wallet.publicKey && !provider.connection) return;
 
-		// console.log(connection.getAccountInfo);
-		// // const pubkey = new web3.PublicKey(String(wallet.publicKey.toBase58()));
+		// console.log('wallet', wallet.publicKey.toBase58());
+		userToken = await getOrCreateAssociatedTokenAccount(
+			connection,
+			wallet,
+			mint,
+			wallet.publicKey
+		);
 
-		// // const buffer = pubkey.toBuffer();
-
-		// if (
-		// 	connection instanceof web3.Connection &&
-		// 	typeof connection.getAccountInfo === 'function'
-		// ) {
-		// 	console.log('IT WORKS!', connection.getAccountInfo);
-		// } else {
-		// 	console.log(
-		// 		'connection is not an instance of Connection or getAccountInfo is not a function'
-		// 	);
-		// }
-
-		// // console.log('wallet', wallet.publicKey.toBase58());
-		// userToken = await getOrCreateAssociatedTokenAccount(
-		// 	connection,
-		// 	wallet,
-		// 	mint,
-		// 	wallet.publicKey
-		// );
+		console.log('USERTOKEN GOT DEFINED!!! NEXT FUNCTIOn...');
 	}
 
 	// Set Initialize
 	async function initializeLock() {
-		if (!provider) return;
+		if (!wallet.publicKey && !provider.connection) return;
 
 		await beforeRun();
+
+		console.log('baseacc', baseAccount.publicKey);
+		console.log('wallet', wallet.publicKey);
+		console.log('feeacc', feeAccount);
+		console.log('program id', programID);
+		console.log('base acc withouut pub key', baseAccount);
 
 		const tx = await program.methods
 			.initialize(new BN(1), new BN(3 * anchor.web3.LAMPORTS_PER_SOL))
 			.accounts({
 				baseAccount: baseAccount.publicKey,
-				owner: publicKey,
+				owner: wallet.publicKey,
 				feeAccount: feeAccount,
-				systemProgram: anchor.web3.SystemProgram.programId,
+				systemProgram: programID,
 			})
 			.signers([baseAccount])
 			.rpc();
