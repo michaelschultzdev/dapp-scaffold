@@ -1,8 +1,10 @@
-//see sceenshot on eskop
-
-///https://docs.shyft.to/tutorials/how-to-sign-transactions-on-solana
-
-import React, { useCallback, useEffect, useRef, useMemo } from 'react';
+import React, {
+	useCallback,
+	useEffect,
+	useRef,
+	useMemo,
+	useState,
+} from 'react';
 import Details from './Details';
 import CommDatails from './CommissionDetails';
 import { useAnchorWallet } from '@solana/wallet-adapter-react';
@@ -40,8 +42,6 @@ import {
 } from '../contexts/NetworkConfigurationProvider';
 import { BN } from 'bn.js';
 
-const programID = new PublicKey(idl.metadata.address);
-
 import { createClient } from '@supabase/supabase-js';
 
 const supabase = createClient(
@@ -51,11 +51,39 @@ const supabase = createClient(
 
 const SendContractTransaction = () => {
 	const { publicKey, sendTransaction } = useWallet();
+	const [loadedProvider, setLoadedProvider] = useState(null);
 
 	const { networkConfiguration } = useNetworkConfiguration();
 	const network = networkConfiguration;
 	const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 	const connection = useMemo(() => new Connection(endpoint), [endpoint]);
+	const programID = new PublicKey(idl.metadata.address);
+
+	// const wallet = useWallet();
+	const wallet = useWallet();
+
+	const provider = new AnchorProvider(connection, wallet, {
+		commitment: 'processed',
+	});
+	const program = new Program(idl, programID, provider);
+
+	useEffect(() => {
+		if (provider.wallet?.publicKey) {
+			console.log('proggggg', provider);
+			setLoadedProvider(provider);
+			console.log('THE PROVIDER', loadedProvider, 'provider itself', provider);
+			notify({
+				type: 'success',
+				message: `Wallet connected: ${provider.wallet.publicKey}`,
+			});
+		} else {
+			console.log('nuttin');
+		}
+	}, [provider.wallet]);
+
+	useEffect(() => {
+		console.log('THE PROVIDER ZZZZ', loadedProvider);
+	}, [loadedProvider]);
 
 	const mint = new PublicKey('H5mWy9iYTPWSB1mbSnMKoYdGggbH1QrUPkgqFJQabqbX');
 	const recipient = new PublicKey(
@@ -64,72 +92,67 @@ const SendContractTransaction = () => {
 	const feeAccount = new PublicKey(
 		'FX9yNH3yRMUvmW5UASJ7nsQpnXvEhHF3i2xMBppwuU7t'
 	);
-	const provider = new AnchorProvider(connection, publicKey, {
-		commitment: 'processed',
-	});
 
-	setProvider(provider);
-	const wallet = useAnchorWallet();
-
-	console.log('provider', provider.wallet);
-	console.log('connection', connection);
-	const program = new Program(idl, programID, provider);
 	// const program = new Program(idl, programID, connection);
 	const baseAccount = anchor.web3.Keypair.generate();
 	const userToken = useRef(null);
-	const user = provider.wallet;
-	const signer = baseAccount.publicKey;
 
 	const start = new BN(+new Date('2024-03-12T01:24:00'));
 	const end = new BN(+new Date('2024-03-14T12:24:00'));
+
+	let userdata;
 
 	// Replace with actual lock info from DB and CA
 	let lockInfo = {};
 
 	useEffect(() => {
-		async function getUserToken() {
-			if (!provider.wallet) {
-				return;
+		if (!loadedProvider) return;
+
+		if (loadedProvider.wallet.publicKey) {
+			async function getUserToken() {
+				console.log('provider is loaded...', connection);
+				const token = await getOrCreateAssociatedTokenAccount(
+					connection,
+					baseAccount.publicKey,
+					mint,
+					loadedProvider.wallet.publicKey
+				);
+				userToken.current = token;
 			}
-			console.log('provider.wallet', provider.wallet);
-			const token = await getOrCreateAssociatedTokenAccount(
-				connection,
-				baseAccount.publicKey,
-				mint,
-				provider.wallet
-			);
-			userToken.current = token;
+			getUserToken();
 		}
-		getUserToken();
-		console.log('userToken!!!!', userToken);
-	});
+	}, [loadedProvider]);
 
 	const initializeLock = useCallback(async () => {
-		if (!user) {
+		if (!loadedProvider) {
 			notify({ type: 'error', message: `Wallet not connected!` });
 			console.log('error', `Send Transaction: Wallet not connected!`);
 			return;
 		}
-
-		console.log(wallet);
 
 		try {
 			const transaction = await program.methods
 				.initialize(new BN(1), new BN(3 * anchor.web3.LAMPORTS_PER_SOL))
 				.accounts({
 					baseAccount: baseAccount.publicKey,
-					owner: wallet.publicKey,
+					owner: loadedProvider.wallet.publicKey,
 					feeAccount: feeAccount,
-					systemProgram: program.programId,
+					systemProgram: anchor.web3.SystemProgram.programId,
 				})
-				.signers([wallet])
+				.signers([baseAccount])
 				.rpc();
 
-			console.log('lewall', wallet);
+			// console.log('lewall', wallet);
 
-			await web3.sendAndConfirmTransaction(connection, transaction, [
-				baseAccount,
-			]);
+			notify({
+				type: 'success',
+				message: `Slot Reserved!`,
+				description: transaction,
+			});
+
+			// await web3.sendAndConfirmTransaction(connection, transaction, [
+			// 	baseAccount,
+			// ]);
 		} catch (error) {
 			console.log('error', `Transaction failed! ${error?.message}`);
 			notify({
@@ -138,7 +161,114 @@ const SendContractTransaction = () => {
 				description: error?.message,
 			});
 		}
-	}, []);
+		createUserStats();
+	}, [loadedProvider]);
+
+	const createUserStats = useCallback(async () => {
+		if (!loadedProvider) {
+			notify({ type: 'error', message: `Wallet not connected!` });
+			console.log('error', `Send Transaction: Wallet not connected!`);
+			return;
+		}
+
+		try {
+			const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
+				[
+					anchor.utils.bytes.utf8.encode('user-stats'),
+					loadedProvider.wallet.publicKey.toBuffer(),
+				],
+				program.programId
+			);
+
+			userdata = await program.methods
+				.createUserStats()
+				.accounts({
+					user: loadedProvider.wallet.publicKey,
+					userStats: userStatsPDA,
+					systemProgram: anchor.web3.SystemProgram.programId,
+				})
+				.rpc();
+		} catch (error) {
+			console.log('error', `Transaction failed! ${error?.message}`);
+			notify({
+				type: 'error',
+				message: `Transaction failed!`,
+				description: error?.message,
+			});
+		}
+	}, [loadedProvider]);
+
+	async function doVesting(e) {
+		e.preventDefault();
+		const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
+			[
+				anchor.utils.bytes.utf8.encode('user-stats'),
+				loadedProvider.wallet.publicKey.toBuffer(),
+			],
+			program.programId
+		);
+		const [vaultPDA, nonce] = PublicKey.findProgramAddressSync(
+			[baseAccount.publicKey.toBuffer()],
+			program.programId
+		);
+		const recipientToken = await getOrCreateAssociatedTokenAccount(
+			connection,
+			baseAccount.publicKey,
+			mint,
+			loadedProvider.wallet.publicKey
+		);
+		const feeToken = await getOrCreateAssociatedTokenAccount(
+			connection,
+			baseAccount.publicKey,
+			mint,
+			feeAccount
+		);
+
+		// console.log('fee token done', feeToken.address.toString());
+
+		const userToken = await getOrCreateAssociatedTokenAccount(
+			connection,
+			baseAccount.publicKey,
+			mint,
+			loadedProvider.wallet.publicKey
+		);
+
+		console.log('got user token', userToken);
+
+		const tx = await program.methods
+			.createVesting(
+				new BN(10 * anchor.web3.LAMPORTS_PER_SOL),
+				start,
+				end,
+				true,
+				nonce
+			)
+			.accounts({
+				user: loadedProvider.wallet.publicKey,
+				userStats: userStatsPDA,
+				userToken: userToken.address,
+				recipient: recipient,
+				recipientToken: recipientToken.address,
+				feeToken: feeToken.address,
+				mint: mint,
+				vault: vaultPDA,
+				clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
+				tokenProgram: TOKEN_PROGRAM_ID,
+				associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+				baseAccount: baseAccount.publicKey,
+				feeAccount: feeAccount,
+			})
+			.signers([])
+			.rpc();
+		console.log('done!!');
+		console.log('Your transaction signature', tx);
+		console.log(
+			'Time expire set:',
+			end,
+			'clock:',
+			anchor.web3.SYSVAR_CLOCK_PUBKEY
+		);
+	}
 
 	return (
 		<div className='flex lg:flex-row flex-col lg:space-x-5 lg:space-y-0 space-y-5 mt-5 min-w-7xl max-w-7xl mx-auto'>
@@ -151,6 +281,8 @@ const SendContractTransaction = () => {
 					<p className='mb-5 lg:max-w-4xl'>
 						Make sure the wallet you wish to lock with is connected, then press
 						the Reserve Slot button to create a space especially for your lock.
+						You will see two transactions happen, and each will cost a very
+						small amount of SOL.
 					</p>
 					<button
 						className='px-10 sm:w-full py-3 bg-gradient-to-b rounded from-[#5892a5] to-[#095670] items-center'
@@ -158,12 +290,12 @@ const SendContractTransaction = () => {
 					>
 						Reserve Slot
 					</button>
-					<button
+					{/* <button
 						className='px-10 sm:w-full py-3 bg-gradient-to-b rounded from-[#5892a5] to-[#095670] items-center'
 						onClick={() => createUserStats()}
 					>
 						User Data
-					</button>
+					</button> */}
 				</div>
 				<h2 className='text-2xl text-white pb-0 mb-3'>Step 2:</h2>
 				<p className='mb-5 lg:max-w-4xl'>
@@ -171,10 +303,7 @@ const SendContractTransaction = () => {
 					is immutable once submitted. The lock will be tied to the expiration
 					date, which once set cannot be unlocked by anyone for any reason.
 				</p>
-				<form
-					// onSubmit={(e) => sendSolana(e)}
-					className='mt-5'
-				>
+				<form onSubmit={(e) => doVesting(e)} className='mt-5'>
 					<div className='mb-5'>
 						<label
 							htmlFor='name'

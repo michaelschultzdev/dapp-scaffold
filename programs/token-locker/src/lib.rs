@@ -4,7 +4,7 @@ use anchor_spl::{
     token::{self, Mint, Token, TokenAccount, Transfer},
 };
 
-declare_id!("CT9n2yqLm8yn4BwZZWvAy4zT9i45gig2dpYiCoUZTKXj");
+declare_id!("7M9PoX5GMSTrR5AeiugKD3Kzrt51vLoqNzvJYiS8wdZm");
 
 #[program]
 pub mod token_locker {
