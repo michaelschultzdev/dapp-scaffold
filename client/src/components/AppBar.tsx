@@ -34,13 +34,15 @@ export const AppBar: React.FC = () => {
 							<Image src={Logo} width='987' height='318' alt='SolFi' />
 						</Link>
 					</div>
-					<WalletMultiButtonDynamic className='btn-ghost btn-sm relative flex md:hidden text-lg ' />
+					<div className='flex md:hidden'>
+						<WalletMultiButtonDynamic className='btn-ghost btn-sm relative flex md:hidden text-lg ' />
+					</div>
 				</div>
 
 				{/* Nav Links */}
 				{/* Wallet & Settings */}
 				<div className='navbar-end'>
-					<div className='hidden md:inline-flex align-items-center justify-items gap-6'>
+					<div className='hidden md:inline-flex align-items-center justify-items items-center gap-6 mr-8'>
 						<NavElement
 							label='Home'
 							href='/'
