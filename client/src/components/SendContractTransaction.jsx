@@ -1,12 +1,21 @@
-import React, { useCallback, useEffect, useRef } from 'react';
+//see sceenshot on eskop
+
+///https://docs.shyft.to/tutorials/how-to-sign-transactions-on-solana
+
+import React, { useCallback, useEffect, useRef, useMemo } from 'react';
 import Details from './Details';
 import CommDatails from './CommissionDetails';
+import { useAnchorWallet } from '@solana/wallet-adapter-react';
+
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import {
 	Transaction,
 	SystemProgram,
 	PublicKey,
 	Account,
+	Connection,
+	getParsedTranscation,
+	clusterApiUrl,
 } from '@solana/web3.js';
 import { notify } from '../utils/notifications';
 import {
@@ -18,14 +27,35 @@ import Flatpickr from 'react-flatpickr';
 import 'flatpickr/dist/themes/material_green.css';
 import idl from '../idl/token_locker.json';
 import * as anchor from '@project-serum/anchor';
-import { Program } from '@project-serum/anchor';
+import {
+	Program,
+	setProvider,
+	web3,
+	AnchorProvider,
+	signAndSendTransaction,
+} from '@project-serum/anchor';
+import {
+	NetworkConfigurationProvider,
+	useNetworkConfiguration,
+} from '../contexts/NetworkConfigurationProvider';
 import { BN } from 'bn.js';
 
 const programID = new PublicKey(idl.metadata.address);
 
+import { createClient } from '@supabase/supabase-js';
+
+const supabase = createClient(
+	'https://ipudikgouqovvhvvwege.supabase.co',
+	'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwdWRpa2dvdXFvdnZodnZ3ZWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk0NjkxMDUsImV4cCI6MjAyNTA0NTEwNX0.P9BLA8DB-fYzIanWDr92Pfwt5wyKMzgxdDeKu7731x0'
+);
+
 const SendContractTransaction = () => {
-	const { connection } = useConnection();
 	const { publicKey, sendTransaction } = useWallet();
+
+	const { networkConfiguration } = useNetworkConfiguration();
+	const network = networkConfiguration;
+	const endpoint = useMemo(() => clusterApiUrl(network), [network]);
+	const connection = useMemo(() => new Connection(endpoint), [endpoint]);
 
 	const mint = new PublicKey('H5mWy9iYTPWSB1mbSnMKoYdGggbH1QrUPkgqFJQabqbX');
 	const recipient = new PublicKey(
@@ -34,9 +64,21 @@ const SendContractTransaction = () => {
 	const feeAccount = new PublicKey(
 		'FX9yNH3yRMUvmW5UASJ7nsQpnXvEhHF3i2xMBppwuU7t'
 	);
-	const program = new Program(idl, programID, connection);
+	const provider = new AnchorProvider(connection, publicKey, {
+		commitment: 'processed',
+	});
+
+	setProvider(provider);
+	const wallet = useAnchorWallet();
+
+	console.log('provider', provider.wallet);
+	console.log('connection', connection);
+	const program = new Program(idl, programID, provider);
+	// const program = new Program(idl, programID, connection);
 	const baseAccount = anchor.web3.Keypair.generate();
 	const userToken = useRef(null);
+	const user = provider.wallet;
+	const signer = baseAccount.publicKey;
 
 	const start = new BN(+new Date('2024-03-12T01:24:00'));
 	const end = new BN(+new Date('2024-03-14T12:24:00'));
@@ -46,84 +88,67 @@ const SendContractTransaction = () => {
 
 	useEffect(() => {
 		async function getUserToken() {
-			if (!publicKey) {
+			if (!provider.wallet) {
 				return;
 			}
+			console.log('provider.wallet', provider.wallet);
 			const token = await getOrCreateAssociatedTokenAccount(
 				connection,
-				publicKey,
+				baseAccount.publicKey,
 				mint,
-				publicKey
+				provider.wallet
 			);
 			userToken.current = token;
 		}
 		getUserToken();
+		console.log('userToken!!!!', userToken);
 	});
 
 	const initializeLock = useCallback(async () => {
-		if (!publicKey) {
+		if (!user) {
 			notify({ type: 'error', message: `Wallet not connected!` });
 			console.log('error', `Send Transaction: Wallet not connected!`);
 			return;
 		}
 
-		// console.log('user token', userToken.current);
-
-		let signature = '';
+		console.log(wallet);
 
 		try {
-			const tx = new Transaction().add(
-				program.instruction.initialize(
-					new BN(1),
-					new BN(3 * anchor.web3.LAMPORTS_PER_SOL),
-					{
-						accounts: {
-							baseAccount: baseAccount.publicKey,
-							owner: publicKey,
-							feeAccount,
-							systemProgram: SystemProgram.programId,
-						},
-						signers: [baseAccount],
-					}
-				)
-			);
+			const transaction = await program.methods
+				.initialize(new BN(1), new BN(3 * anchor.web3.LAMPORTS_PER_SOL))
+				.accounts({
+					baseAccount: baseAccount.publicKey,
+					owner: wallet.publicKey,
+					feeAccount: feeAccount,
+					systemProgram: program.programId,
+				})
+				.signers([wallet])
+				.rpc();
 
-			signature = await sendTransaction(tx, connection, {
-				signers: [baseAccount],
-			});
+			console.log('lewall', wallet);
 
-			signature = await sendTransaction(tx, connection);
-
-			await connection.confirmTransaction(signature, 'confirmed');
-
-			console.log(signature);
-			notify({
-				type: 'success',
-				message: 'Transaction successful!',
-				txid: signature,
-			});
+			await web3.sendAndConfirmTransaction(connection, transaction, [
+				baseAccount,
+			]);
 		} catch (error) {
 			console.log('error', `Transaction failed! ${error?.message}`);
 			notify({
 				type: 'error',
 				message: `Transaction failed!`,
 				description: error?.message,
-				txid: signature,
 			});
 		}
-	}, [connection, publicKey, sendTransaction]);
+	}, []);
 
 	return (
 		<div className='flex lg:flex-row flex-col lg:space-x-5 lg:space-y-0 space-y-5 mt-5 min-w-7xl max-w-7xl mx-auto'>
 			<div className='grow rounded-xl bg-[#092E3A] p-7 lg:mx-0 mx-5 text-left'>
-				<h2 className='text-2xl text-white pb-0 mb-0'>
-					Enter Lock Information
-				</h2>
+				<h2 className='text-2xl text-white pb-0 mb-0'>Lock Setup</h2>
 				<hr className='border-[#1e4957] pb-1 mt-5' />
 
 				<div className='mb-10 mt-5'>
 					<h2 className='text-2xl text-white pb-0 mb-5'>Step 1:</h2>
-					<p className='mb-5'>
+					<p className='mb-5 lg:max-w-4xl'>
 						Make sure the wallet you wish to lock with is connected, then press
 						the Reserve Slot button to create a space especially for your lock.
 					</p>
@@ -133,8 +158,19 @@ const SendContractTransaction = () => {
 					>
 						Reserve Slot
 					</button>
+					<button
+						className='px-10 sm:w-full py-3 bg-gradient-to-b rounded from-[#5892a5] to-[#095670] items-center'
+						onClick={() => createUserStats()}
+					>
+						User Data
+					</button>
 				</div>
 				<h2 className='text-2xl text-white pb-0 mb-3'>Step 2:</h2>
+				<p className='mb-5 lg:max-w-4xl'>
+					Enter your lock information below. Be sure to double-check it, as it
+					is immutable once submitted. The lock will be tied to the expiration
+					date, which once set cannot be unlocked by anyone for any reason.
+				</p>
 				<form
 					// onSubmit={(e) => sendSolana(e)}
 					className='mt-5'
@@ -270,60 +306,3 @@ const SendContractTransaction = () => {
 };
 
 export default SendContractTransaction;
-
-// import React, { useCallback } from 'react';
-// import { useConnection, useWallet } from '@solana/wallet-adapter-react';
-// import { Transaction, SystemProgram, PublicKey } from '@solana/web3.js';
-// import { notify } from '../utils/notifications';
-// import idl from '../idl/token_locker.json';
-// import { Program } from '@project-serum/anchor';
-
-// const programID = new PublicKey(idl.metadata.address);
-
-// const SendContractTransaction = () => {
-// 	const { connection } = useConnection();
-// 	const { publicKey, sendTransaction } = useWallet();
-
-// 	const onClick = useCallback(async () => {
-// 		if (!publicKey) {
-// 			notify({ type: 'error', message: `Wallet not connected!` });
-// 			console.log('error', `Send Transaction: Wallet not connected!`);
-// 			return;
-// 		}
-
-// 		let signature = '';
-// 		try {
-// 			const program = new Program(idl, programID, connection);
-// 			const tx = new Transaction().add(
-// 				SystemProgram.transfer({
-// 					fromPubkey: publicKey,
-// 					toPubkey: program.programId,
-// 					lamports: 1_000_000,
-// 				})
-// 			);
-
-// 			signature = await sendTransaction(tx, connection);
-
-// 			await connection.confirmTransaction(signature, 'confirmed');
-
-// 			console.log(signature);
-// 			notify({
-// 				type: 'success',
-// 				message: 'Transaction successful!',
-// 				txid: signature,
-// 			});
-// 		} catch (error) {
-// 			console.log('error', `Transaction failed! ${error?.message}`);
-// 			notify({
-// 				type: 'error',
-// 				message: `Transaction failed!`,
-// 				description: error?.message,
-// 				txid: signature,
-// 			});
-// 		}
-// 	}, [connection, publicKey, sendTransaction]);
-
-// 	return <button onClick={onClick}>Send Contract Transaction</button>;
-// };
-
-// export default SendContractTransaction;
