@@ -8,7 +8,6 @@ import React, {
 import Details from './Details';
 import CommDatails from './CommissionDetails';
 import { useAnchorWallet } from '@solana/wallet-adapter-react';
-
 import { useConnection, useWallet } from '@solana/wallet-adapter-react';
 import {
 	Transaction,
@@ -19,11 +18,14 @@ import {
 	getParsedTranscation,
 	clusterApiUrl,
 } from '@solana/web3.js';
+import getTokenMetadata from './getMintMetadata';
 import { notify } from '../utils/notifications';
 import {
 	ASSOCIATED_TOKEN_PROGRAM_ID,
 	getOrCreateAssociatedTokenAccount,
 	TOKEN_PROGRAM_ID,
+	getAssociatedTokenAddress,
+	getAssociatedTokenAddressSync,
 } from '@solana/spl-token';
 import Flatpickr from 'react-flatpickr';
 import 'flatpickr/dist/themes/material_green.css';
@@ -60,33 +62,38 @@ const SendContractTransaction = () => {
 
 	const [tokens, setTokens] = useState([]);
 	const [selectedToken, setSelectedToken] = useState('');
-	const [selectedDecimals, setSelectedTokenDecimals] = useState('');
+	const [selectedTokenAccount, setSelectedTokenAccount] = useState('');
+	const [tokenAccount, setTokenAccount] = useState('');
 	const [selectedTokenAmount, setSelectedTokenAmount] = useState(0);
 	const [totalAvailableTokenAmount, setTotalAvailableTokenAmount] = useState(0);
 	const [ownerWallet, setOwnerWallet] = useState('');
-	const [mintAddress, setMintAddress] = useState('');
+	const [selectedDecimals, setSelectedTokenDecimals] = useState('');
+	const [tokensWithMetadata, setTokensWithMetadata] = useState([]);
+
+	const [mintAddressPubKey, setMintAddressPubKey] = useState('');
+	const [metadata, setMetadata] = useState({
+		tokenName: '',
+		symbol: '',
+		logo: '',
+	});
 
 	const [lockInfo, setLockInfo] = useState({
-		name: '',
+		lockName: '',
 		token: '',
 		owner: '',
 		amount: 0,
 		decimals: '',
+		tokenName: '',
+		symbol: '',
+		logo: null,
 		date: null,
 	});
-
-	// const handleChange = (e, field) => {
-	// 	const value = e.target.value;
-	// 	setLockInfo((prevState) => ({
-	// 		...prevState,
-	// 		[field]: value,
-	// 	}));
-	// };
 
 	const { networkConfiguration } = useNetworkConfiguration();
 	const network = networkConfiguration;
 	const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 	const connection = useMemo(() => new Connection(endpoint), [endpoint]);
+	console.log;
 	const programID = new PublicKey(idl.metadata.address);
 
 	// const wallet = useWallet();
@@ -110,10 +117,18 @@ const SendContractTransaction = () => {
 	}, [provider.wallet]);
 
 	useEffect(() => {
-		if (loadedProvider) console.log(loadedProvider, 'Connected.');
+		if (loadedProvider) console.log('Connected to provider.');
 	}, [loadedProvider]);
 
-	const mint = new PublicKey('H5mWy9iYTPWSB1mbSnMKoYdGggbH1QrUPkgqFJQabqbX');
+	useEffect(() => {
+		async function fetchMetadata() {
+			const metadata = await getTokenMetadata(mintAddressPubKey);
+			setMetadata(metadata);
+		}
+
+		fetchMetadata();
+	}, [mintAddressPubKey]);
+
 	const recipient = new PublicKey(
 		'Bkj7fVXttCm2A5P53z2K5u16jb8HTxRb5LzQhhSakVfb'
 	);
@@ -148,38 +163,38 @@ const SendContractTransaction = () => {
 
 	const handleTokenChange = async (e) => {
 		const selectedTokenAddress = e.target.value;
-		setSelectedToken(selectedTokenAddress);
 		const selectedToken = tokens.find(
 			(token) => token.address === selectedTokenAddress
 		);
+		// const selectedMint = tokens.find((token) => token.mint === selectedMint);
+		setSelectedToken(selectedToken);
+
+		console.log('selectedToken WHAT IS TOKEN ACCOUNT?? ', selectedToken);
+
 		setSelectedTokenDecimals(selectedToken ? selectedToken.decimals : ''); // Update selected decimals
 		setSelectedTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
 		setTotalAvailableTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
 
+		if (metadata) {
+		}
+
 		// Update lockInfo state with the selected token address and decimals
 		setLockInfo((prevState) => ({
 			...prevState,
-			token: selectedTokenAddress,
+			token: tokenAccount,
+			mint: selectedToken,
 			owner: ownerWallet,
 			amount: selectedTokenAmount,
+			tokenName: metadata.tokenName,
+			symbol: metadata.symbol,
+			logo: metadata.logo,
 			decimals: selectedToken ? selectedToken.decimals : '', // Update decimals in lockInfo
 		}));
 	};
 
-	// useEffect(() => {
-	// 	// console.log('lockInfo.amount');
-	// 	// console.log(lockInfo.amount);
-	// 	setTotalAvailableTokenAmount(lockInfo.amount);
-	// 	console.log('totalAvailableTokenAmount', totalAvailableTokenAmount);
-	// }, [lockInfo]);
-
 	const handleMaxAmount = () => {
 		setSelectedTokenAmount(totalAvailableTokenAmount); // Set the lock amount to the maximum available token amount
 	};
-
-	useEffect(() => {
-		console.log(totalAvailableTokenAmount);
-	}, [lockInfo, selectedTokenAmount, totalAvailableTokenAmount]);
 
 	// Ensure lockInfo.date is initialized on the client side
 	useEffect(() => {
@@ -189,22 +204,7 @@ const SendContractTransaction = () => {
 		}));
 	}, []);
 
-	useEffect(() => {
-		if (!loadedProvider) return;
-
-		if (loadedProvider.wallet.publicKey) {
-			async function getUserToken() {
-				const token = await getOrCreateAssociatedTokenAccount(
-					connection,
-					baseAccount.publicKey,
-					mint,
-					loadedProvider.wallet.publicKey
-				);
-				userToken.current = token;
-			}
-			getUserToken();
-		}
-	}, [loadedProvider]);
+	// Initialize the lock by creating a user stats account
 
 	const initializeLock = useCallback(async () => {
 		if (!loadedProvider) {
@@ -247,6 +247,7 @@ const SendContractTransaction = () => {
 		createUserStats();
 	}, [loadedProvider]);
 
+	// Create user stats
 	const createUserStats = useCallback(async () => {
 		if (!loadedProvider) {
 			notify({ type: 'error', message: `Wallet not connected!` });
@@ -281,19 +282,23 @@ const SendContractTransaction = () => {
 		}
 	}, [loadedProvider]);
 
+	// Fetch the user's token accounts and store them in the tokens state
+	// Modify fetchTokensWithMetadata function to limit the number of tokens fetched
 	useEffect(() => {
 		if (!loadedProvider) return;
-		console.log('running token fetcher');
-		const fetchTokens = async () => {
+		const fetchTokensWithMetadata = async () => {
 			try {
 				const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
 					loadedProvider.wallet.publicKey,
 					{ programId: TOKEN_PROGRAM_ID }
 				);
 
+				// Limit the number of tokens fetched to 5
+				const tokenAccountsLimited = tokenAccounts.value.slice(0, 5);
+
 				const uniqueTokens = new Set();
 
-				for (const { pubkey, account } of tokenAccounts.value) {
+				for (const { pubkey, account } of tokenAccountsLimited) {
 					const MY_WALLET_ADDRESS = loadedProvider.wallet.publicKey.toString();
 
 					const accounts = await connection.getParsedProgramAccounts(
@@ -313,14 +318,10 @@ const SendContractTransaction = () => {
 						}
 					);
 
-					setOwnerWallet(loadedProvider.wallet.publicKey.toBase58());
-
-					console.log(ownerWallet, 'owner wallet');
-
 					accounts.forEach((account, i) => {
 						const token = {
 							address: pubkey.toBase58(),
-							symbol: account.account.data.parsed.info.mint,
+							mint: account.account.data.parsed.info.mint,
 							amount: account.account.data.parsed.info.tokenAmount.uiAmount,
 							decimals: account.account.data.parsed.info.tokenAmount.decimals,
 						};
@@ -328,14 +329,58 @@ const SendContractTransaction = () => {
 					});
 				}
 
-				setTokens(Array.from(uniqueTokens));
+				const tokensWithMetadata = await Promise.all(
+					Array.from(uniqueTokens).map(async (token) => {
+						if (token.mint) {
+							console.log('WE GOT A MINT', token.mint.toString());
+							const metadata = await getTokenMetadata(token.mint.toString()); // Fetch metadata for each token
+							return {
+								...token,
+								metadata,
+							};
+						} else {
+							return token;
+						}
+					})
+				);
+
+				setTokensWithMetadata(tokensWithMetadata);
+
+				console.log('TOKENS WITH METADATA', tokensWithMetadata);
+
+				// Update lockInfo state with the selected token address and decimals
+				setLockInfo((prevState) => ({
+					...prevState,
+					token: tokenAccount,
+					owner: ownerWallet,
+					amount: selectedTokenAmount,
+					decimals: selectedDecimals, // Update decimals in lockInfo
+				}));
 			} catch (error) {
 				console.error('Error fetching tokens:', error);
 			}
 		};
 
-		fetchTokens();
-	}, [loadedProvider]);
+		fetchTokensWithMetadata();
+	}, [
+		loadedProvider,
+		tokenAccount,
+		ownerWallet,
+		selectedTokenAmount,
+		selectedDecimals,
+	]);
+	// Get the user's selected token and extract the mint address
+
+	useEffect(() => {
+		if (!selectedToken) return;
+
+		async function getMintData() {
+			setMintAddressPubKey(selectedToken.mint);
+		}
+		c;
+		getMintData();
+	}, [selectedToken]);
+	// Commmand to run the vesting after all else is completed
 
 	async function doVesting() {
 		const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
@@ -352,26 +397,24 @@ const SendContractTransaction = () => {
 		const recipientToken = await getOrCreateAssociatedTokenAccount(
 			connection,
 			baseAccount.publicKey,
-			mint,
+			mintAddressPubKey,
 			loadedProvider.wallet.publicKey
 		);
 		const feeToken = await getOrCreateAssociatedTokenAccount(
 			connection,
 			baseAccount.publicKey,
-			mint,
+			mintAddressPubKey,
 			feeAccount
 		);
-
-		// console.log('fee token done', feeToken.address.toString());
 
 		const userToken = await getOrCreateAssociatedTokenAccount(
 			connection,
 			baseAccount.publicKey,
-			mint,
+			mintAddressPubKey,
 			loadedProvider.wallet.publicKey
 		);
 
-		console.log('got user token', userToken);
+		console.log('VESTING START - got user token', userToken);
 
 		const tx = await program.methods
 			.createVesting(
@@ -388,7 +431,7 @@ const SendContractTransaction = () => {
 				recipient: recipient,
 				recipientToken: recipientToken.address,
 				feeToken: feeToken.address,
-				mint: mint,
+				mint: mintAddressPubKey,
 				vault: vaultPDA,
 				clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
 				tokenProgram: TOKEN_PROGRAM_ID,
@@ -452,7 +495,7 @@ const SendContractTransaction = () => {
 						<input
 							type='text'
 							id='lockname'
-							value={lockInfo.name}
+							value={lockInfo.user}
 							onChange={(e) => handleChange(e, 'name')}
 							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
 							placeholder='Token LP Lock'
@@ -473,10 +516,12 @@ const SendContractTransaction = () => {
 							onChange={handleTokenChange}
 							className='minimal bg-[#1e4957] border border-[#346b7d] text-gray-200 text-sm rounded-lg focus:ring-[#1e4957] focus:border-[#1e4957] block w-full p-2.5 disabled:text-slate-500'
 						>
-							<option>-- Select a token --</option>
-							{tokens.map((token) => (
-								<option key={token.address} value={token.address}>
-									{token.address}
+							<option value=''>-- Select a token --</option>
+							{tokensWithMetadata.map((token) => (
+								<option key={token.mint} value={token.mint}>
+									{token.metadata
+										? `${token.metadata.name} (${token.metadata.symbol})`
+										: token.mint}
 								</option>
 							))}
 						</select>
@@ -581,11 +626,11 @@ const SendContractTransaction = () => {
 			<div className='flex-col space-y-5 grow-0'>
 				<div className='grow-0 flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
 					<Details
-						lockInfo={lockInfo.name}
+						lockInfo={lockInfo.lockName}
 						lockToken={lockInfo.token}
 						lockOwner={lockInfo.owner}
 						lockDate={lockInfo.date}
-						lockAmount={lockInfo.amount}
+						lockAmount={totalAvailableTokenAmount}
 					/>
 				</div>
 				<div className=' grow-0 flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
