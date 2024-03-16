@@ -19,9 +19,9 @@ const NotificationList = () => {
 
 	return (
 		<div
-			className={`z-20 fixed inset-20 flex items-end px-0 py-6 pointer-events-none sm:p-6`}
+			className={`z-20 fixed inset-0 flex items-end px-0 py-6 pointer-events-none sm:p-6`}
 		>
-			<div className={`flex flex-col w-full`}>
+			<div className={`flex flex-col w-full items-end justify-end`}>
 				{reversedNotifications.map((n, idx) => (
 					<Notification
 						key={`${n.message}${idx}`}
@@ -56,7 +56,7 @@ const Notification = ({ type, message, description, txid, onHide }) => {
 	useEffect(() => {
 		const id = setTimeout(() => {
 			onHide();
-		}, 8000);
+		}, 4000);
 
 		return () => {
 			clearInterval(id);
@@ -90,7 +90,11 @@ const Notification = ({ type, message, description, txid, onHide }) => {
 					<div className={`ml-2 w-0 flex-1`}>
 						<div className={`font-bold text-fgd-1`}>{message}</div>
 						{description ? (
-							<p className={`mt-0.5 text-sm text-fgd-2`}>{description}</p>
+							<p
+								className={`mt-0.5 text-sm text-fgd-2 text-[#68d9f5] break-all`}
+							>
+								{description}
+							</p>
 						) : null}
 						{txid ? (
 							<div className='flex flex-row'>

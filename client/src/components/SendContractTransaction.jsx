@@ -50,8 +50,38 @@ const supabase = createClient(
 );
 
 const SendContractTransaction = () => {
+	function truncate(str) {
+		return str.length > 10
+			? str.substring(0, 5) + '...' + str.substring(str.length - 5)
+			: str;
+	}
 	const { publicKey, sendTransaction } = useWallet();
 	const [loadedProvider, setLoadedProvider] = useState(null);
+
+	const [tokens, setTokens] = useState([]);
+	const [selectedToken, setSelectedToken] = useState('');
+	const [selectedDecimals, setSelectedTokenDecimals] = useState('');
+	const [selectedTokenAmount, setSelectedTokenAmount] = useState(0);
+	const [totalAvailableTokenAmount, setTotalAvailableTokenAmount] = useState(0);
+	const [ownerWallet, setOwnerWallet] = useState('');
+	const [mintAddress, setMintAddress] = useState('');
+
+	const [lockInfo, setLockInfo] = useState({
+		name: '',
+		token: '',
+		owner: '',
+		amount: 0,
+		decimals: '',
+		date: null,
+	});
+
+	// const handleChange = (e, field) => {
+	// 	const value = e.target.value;
+	// 	setLockInfo((prevState) => ({
+	// 		...prevState,
+	// 		[field]: value,
+	// 	}));
+	// };
 
 	const { networkConfiguration } = useNetworkConfiguration();
 	const network = networkConfiguration;
@@ -69,20 +99,18 @@ const SendContractTransaction = () => {
 
 	useEffect(() => {
 		if (provider.wallet?.publicKey) {
-			console.log('proggggg', provider);
 			setLoadedProvider(provider);
-			console.log('THE PROVIDER', loadedProvider, 'provider itself', provider);
 			notify({
 				type: 'success',
-				message: `Wallet connected: ${provider.wallet.publicKey}`,
+				message: `Wallet connected!`,
+				description: truncate(provider.wallet.publicKey.toBase58()),
 			});
 		} else {
-			console.log('nuttin');
 		}
 	}, [provider.wallet]);
 
 	useEffect(() => {
-		console.log('THE PROVIDER ZZZZ', loadedProvider);
+		if (loadedProvider) console.log(loadedProvider, 'Connected.');
 	}, [loadedProvider]);
 
 	const mint = new PublicKey('H5mWy9iYTPWSB1mbSnMKoYdGggbH1QrUPkgqFJQabqbX');
@@ -102,15 +130,70 @@ const SendContractTransaction = () => {
 
 	let userdata;
 
-	// Replace with actual lock info from DB and CA
-	let lockInfo = {};
+	const handleChange = (e, id) => {
+		let value = e.target ? e.target.value : e[0].toISOString();
+		// Check if the field being changed is "owner"
+		if (id === 'owner') {
+			// Update ownerWallet state as well
+			setOwnerWallet(value);
+		}
+		if (id === 'amount') {
+			setSelectedTokenAmount(value);
+		}
+		setLockInfo((prevState) => ({
+			...prevState,
+			[id]: value,
+		}));
+	};
+
+	const handleTokenChange = async (e) => {
+		const selectedTokenAddress = e.target.value;
+		setSelectedToken(selectedTokenAddress);
+		const selectedToken = tokens.find(
+			(token) => token.address === selectedTokenAddress
+		);
+		setSelectedTokenDecimals(selectedToken ? selectedToken.decimals : ''); // Update selected decimals
+		setSelectedTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
+		setTotalAvailableTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
+
+		// Update lockInfo state with the selected token address and decimals
+		setLockInfo((prevState) => ({
+			...prevState,
+			token: selectedTokenAddress,
+			owner: ownerWallet,
+			amount: selectedTokenAmount,
+			decimals: selectedToken ? selectedToken.decimals : '', // Update decimals in lockInfo
+		}));
+	};
+
+	// useEffect(() => {
+	// 	// console.log('lockInfo.amount');
+	// 	// console.log(lockInfo.amount);
+	// 	setTotalAvailableTokenAmount(lockInfo.amount);
+	// 	console.log('totalAvailableTokenAmount', totalAvailableTokenAmount);
+	// }, [lockInfo]);
+
+	const handleMaxAmount = () => {
+		setSelectedTokenAmount(totalAvailableTokenAmount); // Set the lock amount to the maximum available token amount
+	};
+
+	useEffect(() => {
+		console.log(totalAvailableTokenAmount);
+	}, [lockInfo, selectedTokenAmount, totalAvailableTokenAmount]);
+
+	// Ensure lockInfo.date is initialized on the client side
+	useEffect(() => {
+		setLockInfo((prevState) => ({
+			...prevState,
+			date: new Date().toISOString(),
+		}));
+	}, []);
 
 	useEffect(() => {
 		if (!loadedProvider) return;
 
 		if (loadedProvider.wallet.publicKey) {
 			async function getUserToken() {
-				console.log('provider is loaded...', connection);
 				const token = await getOrCreateAssociatedTokenAccount(
 					connection,
 					baseAccount.publicKey,
@@ -198,8 +281,63 @@ const SendContractTransaction = () => {
 		}
 	}, [loadedProvider]);
 
-	async function doVesting(e) {
-		e.preventDefault();
+	useEffect(() => {
+		if (!loadedProvider) return;
+		console.log('running token fetcher');
+		const fetchTokens = async () => {
+			try {
+				const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
+					loadedProvider.wallet.publicKey,
+					{ programId: TOKEN_PROGRAM_ID }
+				);
+
+				const uniqueTokens = new Set();
+
+				for (const { pubkey, account } of tokenAccounts.value) {
+					const MY_WALLET_ADDRESS = loadedProvider.wallet.publicKey.toString();
+
+					const accounts = await connection.getParsedProgramAccounts(
+						TOKEN_PROGRAM_ID,
+						{
+							filters: [
+								{
+									dataSize: 165,
+								},
+								{
+									memcmp: {
+										offset: 32,
+										bytes: MY_WALLET_ADDRESS,
+									},
+								},
+							],
+						}
+					);
+
+					setOwnerWallet(loadedProvider.wallet.publicKey.toBase58());
+
+					console.log(ownerWallet, 'owner wallet');
+
+					accounts.forEach((account, i) => {
+						const token = {
+							address: pubkey.toBase58(),
+							symbol: account.account.data.parsed.info.mint,
+							amount: account.account.data.parsed.info.tokenAmount.uiAmount,
+							decimals: account.account.data.parsed.info.tokenAmount.decimals,
+						};
+						uniqueTokens.add(token);
+					});
+				}
+
+				setTokens(Array.from(uniqueTokens));
+			} catch (error) {
+				console.error('Error fetching tokens:', error);
+			}
+		};
+
+		fetchTokens();
+	}, [loadedProvider]);
+
+	async function doVesting() {
 		const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
 			[
 				anchor.utils.bytes.utf8.encode('user-stats'),
@@ -272,7 +410,7 @@ const SendContractTransaction = () => {
 
 	return (
 		<div className='flex lg:flex-row flex-col lg:space-x-5 lg:space-y-0 space-y-5 mt-5 min-w-7xl max-w-7xl mx-auto'>
-			<div className='grow rounded-xl bg-[#092E3A] p-7 lg:mx-0 mx-5 text-left'>
+			<div className='grow-1 rounded-xl bg-[#092E3A] p-7 lg:mx-0 mx-5 text-left'>
 				<h2 className='text-2xl text-white pb-0 mb-0'>Lock Setup</h2>
 				<hr className='border-[#1e4957] pb-1 mt-5' />
 
@@ -303,7 +441,7 @@ const SendContractTransaction = () => {
 					is immutable once submitted. The lock will be tied to the expiration
 					date, which once set cannot be unlocked by anyone for any reason.
 				</p>
-				<form onSubmit={(e) => doVesting(e)} className='mt-5'>
+				<form className='mt-5'>
 					<div className='mb-5'>
 						<label
 							htmlFor='name'
@@ -314,8 +452,8 @@ const SendContractTransaction = () => {
 						<input
 							type='text'
 							id='lockname'
-							// value={lockInfo.name}
-							// onChange={(e) => handleChange(e, 'name')}
+							value={lockInfo.name}
+							onChange={(e) => handleChange(e, 'name')}
 							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
 							placeholder='Token LP Lock'
 							required
@@ -331,16 +469,16 @@ const SendContractTransaction = () => {
 
 						<select
 							id='token'
-							// value={selectedToken}
-							// onChange={handleTokenChange}
+							value={selectedToken}
+							onChange={handleTokenChange}
 							className='minimal bg-[#1e4957] border border-[#346b7d] text-gray-200 text-sm rounded-lg focus:ring-[#1e4957] focus:border-[#1e4957] block w-full p-2.5 disabled:text-slate-500'
 						>
 							<option>-- Select a token --</option>
-							{/* {tokens.map((token) => (
-	                            <option key={token.address} value={token.address}>
-	                                {token.address}
-	                            </option>
-	                        ))} */}
+							{tokens.map((token) => (
+								<option key={token.address} value={token.address}>
+									{token.address}
+								</option>
+							))}
 						</select>
 					</div>
 					<div className='mb-5'>
@@ -349,20 +487,32 @@ const SendContractTransaction = () => {
 							className='block mb-2 text-sm font-medium text-gray-900 dark:text-white'
 						>
 							Lock Amount
-							{/* {lockInfo.amount && (
-										<span className=''> - ({lockInfo.amount} available)</span>
-									)} */}
+							{totalAvailableTokenAmount ? (
+								<span className=''>
+									{' '}
+									- ({totalAvailableTokenAmount} available)
+								</span>
+							) : (
+								''
+							)}
 						</label>
-						<div className='flex items-center'>
+						<div className='flex items-center justify-center'>
 							<input
 								type='text'
-								id='amount'
-								// value={lockInfo.amount}
-								// onChange={(e) => handleChange(e, 'amount')}
+								id='lockamount'
+								value={selectedTokenAmount}
+								onChange={(e) => handleChange(e, 'amount')}
 								className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-								placeholder="EG '100000000'"
+								placeholder='0'
 								required
 							/>
+							<a
+								href='#'
+								onClick={handleMaxAmount}
+								className=' text-sm uppercase font-bold ml-2 tecen bg-[#14333d] border border-[#317186] text-white rounded-lg focus:ring-[#4096b3] focus:border-[#5fafc9] w-28 text-center py-2.5 px-2.5'
+							>
+								use max
+							</a>
 						</div>
 					</div>
 					<div className='mb-4'>
@@ -372,22 +522,25 @@ const SendContractTransaction = () => {
 						>
 							Lock Owner
 						</label>
-						<input
-							type='text'
-							id='owner'
-							// value={ownerWallet}
-							// onChange={(e) => handleChange(e, 'owner')}
-							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-							required
-						/>
+						<div className='flex justify-center'>
+							<input
+								type='text'
+								id='lockowner'
+								value={lockInfo.owner}
+								onChange={(e) => handleChange(e, 'owner')}
+								className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
+								placeholder='Owner Address'
+								required
+							/>
+						</div>
 					</div>
 
 					<input
 						type='text'
 						hidden
 						id='decimals'
-						// value={selectedDecimals}
-						// onChange={(e) => handleChange(e, 'decimals')}
+						value={selectedDecimals}
+						onChange={(e) => handleChange(e, 'decimals')}
 						className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 w-full p-2.5 hidden'
 					/>
 
@@ -399,11 +552,20 @@ const SendContractTransaction = () => {
 							Lock Date/Time
 						</label>
 						<Flatpickr
-							id='LockTime'
-							options={{ enableTime: true }}
-							// value={lockInfo.date} // Convert ISO string to Date object
-							className='text-white bg-[#1e4957] border border-[#346b7d] rounded-lg m-0 w-auto min-w-0 py-2 text-center formtime'
-							// onChange={(value) => handleChange(value, 'date')} // Use "date" as id
+							id='lockdate'
+							value={lockInfo.date}
+							onChange={(date) =>
+								setLockInfo((prevState) => ({ ...prevState, date }))
+							}
+							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
+							placeholder='Select Date and Time'
+							options={{
+								enableTime: true,
+								altInput: true,
+								altFormat: 'F j, Y h:i K',
+								dateFormat: 'Y-m-d H:i:S',
+							}}
+							required
 						/>
 					</div>
 					<div className='mb-5 mt-6'>
@@ -411,13 +573,13 @@ const SendContractTransaction = () => {
 							type='submit'
 							id='submit'
 							className='bg-gradient-to-t from-[#1e4553] to-[#103642] border border-[#33788f] text-white uppercase text-base rounded-lg font-bold cursor-pointer focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-							// disabled={!publicKey}
+							disabled={!publicKey}
 						/>
 					</div>
 				</form>
 			</div>
-			<div className='flex-col space-y-5'>
-				<div className='flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
+			<div className='flex-col space-y-5 grow-0'>
+				<div className='grow-0 flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
 					<Details
 						lockInfo={lockInfo.name}
 						lockToken={lockInfo.token}
@@ -426,7 +588,7 @@ const SendContractTransaction = () => {
 						lockAmount={lockInfo.amount}
 					/>
 				</div>
-				<div className='flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
+				<div className=' grow-0 flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
 					<CommDatails />
 				</div>
 			</div>
