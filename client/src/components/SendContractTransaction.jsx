@@ -163,11 +163,11 @@ const SendContractTransaction = () => {
 
 	const handleTokenChange = async (e) => {
 		const selectedTokenAddress = e.target.value;
-		const selectedToken = tokens.find(
-			(token) => token.address === selectedTokenAddress
+		const selectedToken = tokensWithMetadata.find(
+			(token) => token.mint === selectedTokenAddress
 		);
-		// const selectedMint = tokens.find((token) => token.mint === selectedMint);
-		setSelectedToken(selectedToken);
+
+		setSelectedToken(selectedTokenAddress);
 
 		console.log('selectedToken WHAT IS TOKEN ACCOUNT?? ', selectedToken);
 
@@ -175,19 +175,24 @@ const SendContractTransaction = () => {
 		setSelectedTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
 		setTotalAvailableTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
 
-		if (metadata) {
+		if (selectedToken && selectedToken.metadata) {
+			setMetadata({
+				tokenName: selectedToken.metadata.name,
+				symbol: selectedToken.metadata.symbol,
+				logo: selectedToken.metadata.logo,
+			});
 		}
 
 		// Update lockInfo state with the selected token address and decimals
 		setLockInfo((prevState) => ({
 			...prevState,
 			token: tokenAccount,
-			mint: selectedToken,
+			mint: selectedTokenAddress,
 			owner: ownerWallet,
 			amount: selectedTokenAmount,
-			tokenName: metadata.tokenName,
-			symbol: metadata.symbol,
-			logo: metadata.logo,
+			tokenName: selectedToken ? selectedToken.metadata.name : '',
+			symbol: selectedToken ? selectedToken.metadata.symbol : '',
+			logo: selectedToken ? selectedToken.metadata.logo : null,
 			decimals: selectedToken ? selectedToken.decimals : '', // Update decimals in lockInfo
 		}));
 	};
@@ -286,6 +291,7 @@ const SendContractTransaction = () => {
 	// Modify fetchTokensWithMetadata function to limit the number of tokens fetched
 	useEffect(() => {
 		if (!loadedProvider) return;
+
 		const fetchTokensWithMetadata = async () => {
 			try {
 				const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
@@ -293,41 +299,58 @@ const SendContractTransaction = () => {
 					{ programId: TOKEN_PROGRAM_ID }
 				);
 
-				// Limit the number of tokens fetched to 5
-				const tokenAccountsLimited = tokenAccounts.value.slice(0, 5);
-
 				const uniqueTokens = new Set();
 
-				for (const { pubkey, account } of tokenAccountsLimited) {
-					const MY_WALLET_ADDRESS = loadedProvider.wallet.publicKey.toString();
+				// Split token accounts into batches of 5
+				const tokenAccountBatches = Array.from(
+					{ length: Math.ceil(tokenAccounts.length / 5) },
+					(_, index) => tokenAccounts.slice(index * 5, (index + 1) * 5)
+				);
 
-					const accounts = await connection.getParsedProgramAccounts(
-						TOKEN_PROGRAM_ID,
-						{
-							filters: [
+				for (const tokenAccountBatch of tokenAccountBatches) {
+					const batchPromises = tokenAccountBatch.map(
+						async ({ pubkey, account }) => {
+							const MY_WALLET_ADDRESS =
+								loadedProvider.wallet.publicKey.toString();
+
+							const accounts = await connection.getParsedProgramAccounts(
+								TOKEN_PROGRAM_ID,
 								{
-									dataSize: 165,
-								},
-								{
-									memcmp: {
-										offset: 32,
-										bytes: MY_WALLET_ADDRESS,
-									},
-								},
-							],
+									filters: [
+										{
+											dataSize: 165,
+										},
+										{
+											memcmp: {
+												offset: 32,
+												bytes: MY_WALLET_ADDRESS,
+											},
+										},
+									],
+								}
+							);
+
+							accounts.forEach((account, i) => {
+								const token = {
+									address: pubkey.toBase58(),
+									mint: account.account.data.parsed.info.mint,
+									amount: account.account.data.parsed.info.tokenAmount.uiAmount,
+									decimals:
+										account.account.data.parsed.info.tokenAmount.decimals,
+								};
+								uniqueTokens.add(token);
+							});
 						}
 					);
 
-					accounts.forEach((account, i) => {
-						const token = {
-							address: pubkey.toBase58(),
-							mint: account.account.data.parsed.info.mint,
-							amount: account.account.data.parsed.info.tokenAmount.uiAmount,
-							decimals: account.account.data.parsed.info.tokenAmount.decimals,
-						};
-						uniqueTokens.add(token);
-					});
+					// Execute batch promises concurrently
+					await Promise.allSettled(batchPromises);
+
+					// Introduce a delay between batches
+					await new Promise((resolve) => setTimeout(resolve, 2000));
 				}
+
+				console.log(uniqueTokens, 'uniqueTokens');
 
 				const tokensWithMetadata = await Promise.all(
 					Array.from(uniqueTokens).map(async (token) => {
@@ -345,8 +368,6 @@ const SendContractTransaction = () => {
 				);
 
 				setTokensWithMetadata(tokensWithMetadata);
-
-				console.log('TOKENS WITH METADATA', tokensWithMetadata);
 
 				// Update lockInfo state with the selected token address and decimals
 				setLockInfo((prevState) => ({
@@ -369,6 +390,7 @@ const SendContractTransaction = () => {
 		selectedTokenAmount,
 		selectedDecimals,
 	]);
+
 	// Get the user's selected token and extract the mint address
 
 	useEffect(() => {
