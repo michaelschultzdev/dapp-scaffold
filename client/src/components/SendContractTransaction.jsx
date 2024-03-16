@@ -45,6 +45,7 @@ import {
 import { BN } from 'bn.js';
 
 import { createClient } from '@supabase/supabase-js';
+import { use } from 'chai';
 
 const supabase = createClient(
 	'https://ipudikgouqovvhvvwege.supabase.co',
@@ -66,11 +67,16 @@ const SendContractTransaction = () => {
 	const [tokenAccount, setTokenAccount] = useState('');
 	const [selectedTokenAmount, setSelectedTokenAmount] = useState(0);
 	const [totalAvailableTokenAmount, setTotalAvailableTokenAmount] = useState(0);
-	const [ownerWallet, setOwnerWallet] = useState();
+	const [ownerWallet, setOwnerWallet] = useState('');
 	const [selectedDecimals, setSelectedTokenDecimals] = useState('');
+	const [endDate, setEndDate] = useState(new Date().toISOString());
+	const [startDate, setStartDate] = useState(new Date().toISOString());
 	const [tokensWithMetadata, setTokensWithMetadata] = useState([]);
+	const [recipientAddress, setRecipientAddress] = useState('');
 
-	const [mintAddressPubKey, setMintAddressPubKey] = useState('');
+	const [mintAddressPubKey, setMintAddressPubKey] = useState(
+		new PublicKey('CLaSKXbuMp1BXTya62WDyZoPvgmfcqsdA18rAjBcn9Vw') // set to the SolFi token address bc I can't think of any other
+	);
 	const [metadata, setMetadata] = useState({
 		tokenName: '',
 		symbol: '',
@@ -84,7 +90,8 @@ const SendContractTransaction = () => {
 		decimals: '',
 		tokenName: '',
 		symbol: '',
-		date: null,
+		startDate: null,
+		endDate: null,
 	});
 
 	const { networkConfiguration } = useNetworkConfiguration();
@@ -101,6 +108,10 @@ const SendContractTransaction = () => {
 	function onClickPreventDefault(e) {
 		e.preventDefault();
 	}
+
+	// useEffect(() => {
+	// 	console.log(startDate, 'end', endDate);
+	// }, [startDate, endDate]);
 
 	// const wallet = useWallet();
 	const wallet = useWallet();
@@ -126,6 +137,7 @@ const SendContractTransaction = () => {
 		if (loadedProvider) {
 			console.log('Connected to provider.');
 			setOwnerWallet(loadedProvider.wallet.publicKey.toBase58());
+			setRecipientAddress(loadedProvider.wallet.publicKey.toBase58());
 		}
 	}, [loadedProvider]);
 
@@ -138,9 +150,6 @@ const SendContractTransaction = () => {
 		fetchMetadata();
 	}, [mintAddressPubKey]);
 
-	const recipient = new PublicKey(
-		'Bkj7fVXttCm2A5P53z2K5u16jb8HTxRb5LzQhhSakVfb'
-	);
 	const feeAccount = new PublicKey(
 		'FX9yNH3yRMUvmW5UASJ7nsQpnXvEhHF3i2xMBppwuU7t'
 	);
@@ -149,8 +158,12 @@ const SendContractTransaction = () => {
 	const baseAccount = anchor.web3.Keypair.generate();
 	const userToken = useRef(null);
 
-	const start = new BN(+new Date('2024-03-12T01:24:00'));
-	const end = new BN(+new Date('2024-03-14T12:24:00'));
+	// const start = new BN(+new Date('2024-03-12T01:24:00'));
+	// const end = new BN(+new Date('2024-03-14T12:24:00'));
+	// console.log('start:', startDate, 'end:', endDate);
+
+	const start = new BN(+new Date(startDate));
+	const end = new BN(+new Date(endDate));
 
 	let userdata;
 
@@ -160,12 +173,15 @@ const SendContractTransaction = () => {
 			// Update ownerWallet state as well
 			setLockName(value);
 		}
-		if (id === 'owner') {
+		if (id === 'recipient') {
 			// Update ownerWallet state as well
-			setOwnerWallet(value);
+			setRecipientAddress(value);
 		}
 		if (id === 'amount') {
 			setSelectedTokenAmount(value);
+		}
+		if (id === 'lockdate') {
+			setEndDate(value);
 		}
 		setLockInfo((prevState) => ({
 			...prevState,
@@ -180,8 +196,9 @@ const SendContractTransaction = () => {
 		);
 
 		setSelectedToken(selectedTokenAddress);
+		setMintAddressPubKey(new PublicKey(selectedTokenAddress));
 
-		console.log('selectedToken WHAT IS TOKEN ACCOUNT?? ', selectedToken);
+		// console.log('selectedToken WHAT IS TOKEN ACCOUNT?? ', selectedToken);
 
 		setSelectedTokenDecimals(selectedToken ? selectedToken.decimals : ''); // Update selected decimals
 		setSelectedTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
@@ -202,6 +219,8 @@ const SendContractTransaction = () => {
 			mint: selectedTokenAddress,
 			owner: ownerWallet,
 			amount: selectedTokenAmount,
+			startDate: startDate,
+			endDate: endDate,
 			tokenName: selectedToken ? selectedToken.metadata.name : '',
 			symbol: selectedToken ? selectedToken.metadata.symbol : '',
 			decimals: selectedToken ? selectedToken.decimals : '', // Update decimals in lockInfo
@@ -216,7 +235,7 @@ const SendContractTransaction = () => {
 	useEffect(() => {
 		setLockInfo((prevState) => ({
 			...prevState,
-			date: new Date().toISOString(),
+			startDate: new Date().toISOString(),
 		}));
 	}, []);
 
@@ -292,7 +311,7 @@ const SendContractTransaction = () => {
 			console.log('error', `Transaction failed! ${error?.message}`);
 			notify({
 				type: 'error',
-				message: `Transaction failed!`,
+				message: `Transaction failed! This is expected if your wallet's slot already exists.`,
 				description: error?.message,
 			});
 		}
@@ -378,14 +397,17 @@ const SendContractTransaction = () => {
 	}, [loadedProvider, selectedTokenAmount, selectedDecimals]);
 	// Get the user's selected token and extract the mint address
 
-	useEffect(() => {
-		if (!selectedToken) return;
+	// useEffect(() => {
+	// 	if (!selectedToken) return;
 
-		async function getMintData() {
-			setMintAddressPubKey(selectedToken.mint);
-		}
-		getMintData();
-	}, [selectedToken]);
+	// 	async function getMintData() {
+	// 		setMintAddressPubKey(selectedToken.mint);
+	// 		console.log('Mint address before state update:', selectedToken);
+	// 	}
+	// 	getMintData();
+
+	// 	console.log('Mint address SETTTTT:', mintAddressPubKey);
+	// }, [selectedToken, mintAddressPubKey]);
 	// Commmand to run the vesting after all else is completed
 
 	// Test the submission of all fields to database
@@ -400,6 +422,10 @@ const SendContractTransaction = () => {
 	// }
 
 	async function doVesting() {
+		if (!mintAddressPubKey) {
+			notify({ type: 'error', message: `You must select a token to lock!` });
+			return;
+		}
 		const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
 			[
 				anchor.utils.bytes.utf8.encode('user-stats'),
@@ -407,22 +433,38 @@ const SendContractTransaction = () => {
 			],
 			program.programId
 		);
+
+		console.log('userStatsPDA', userStatsPDA);
+
 		const [vaultPDA, nonce] = PublicKey.findProgramAddressSync(
 			[baseAccount.publicKey.toBuffer()],
 			program.programId
 		);
+
+		console.log('vaultPDA', vaultPDA);
+
 		const recipientToken = await getOrCreateAssociatedTokenAccount(
 			connection,
 			baseAccount.publicKey,
 			mintAddressPubKey,
 			loadedProvider.wallet.publicKey
 		);
+
+		console.log('recipientToken', recipientToken);
+
+		console.log('feeAccount test first, this field should be a publicke.s...');
+		console.log(
+			'feeAccount test first, this field should be a publicke.s...',
+			feeAccount
+		);
+
 		const feeToken = await getOrCreateAssociatedTokenAccount(
 			connection,
 			baseAccount.publicKey,
 			mintAddressPubKey,
 			feeAccount
 		);
+		console.log('feeToken', feeToken);
 
 		const userToken = await getOrCreateAssociatedTokenAccount(
 			connection,
@@ -431,11 +473,56 @@ const SendContractTransaction = () => {
 			loadedProvider.wallet.publicKey
 		);
 
-		console.log('VESTING START - got user token', userToken);
+		let publicKeyRecipientAddress = new PublicKey(recipientAddress);
+
+		console.log(
+			'start',
+			start,
+			'end',
+			end,
+			'user',
+			loadedProvider.wallet.publicKey,
+			'userstats',
+			userStatsPDA,
+			'accounts',
+			{
+				user: loadedProvider.wallet.publicKey.toString(),
+				userStats: userStatsPDA.toString(),
+				userToken: userToken.address.toString(),
+				recipient: publicKeyRecipientAddress.toString(),
+				recipientToken: recipientToken.address.toString(),
+				feeToken: feeToken.address.toString(),
+				mint: mintAddressPubKey.toString(),
+				vault: vaultPDA.toString(),
+				clock: anchor.web3.SYSVAR_CLOCK_PUBKEY.toString(),
+				tokenProgram: TOKEN_PROGRAM_ID.toString(),
+				associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID.toString(),
+				baseAccount: baseAccount.publicKey.toString(),
+				feeAccount: feeAccount.toString(),
+				selectedTokenAmountNoLamports: new BN(selectedTokenAmount).toString(),
+				selectedTokenAmountLamports: new BN(
+					selectedTokenAmount * anchor.web3.LAMPORTS_PER_SOL
+				).toString(),
+			}
+		);
+		// console.log(publicKeyRecipientAddress);
+		// let tester = new PublicKey(ownerWallet.toString());
+		// console.log('fucked up owner wallet eh?', ownerWallet);
+
+		console.log(
+			'start',
+			start,
+			'end',
+			end,
+			'user',
+			loadedProvider.wallet.publicKey,
+			'userstats',
+			userStatsPDA
+		);
 
 		const tx = await program.methods
 			.createVesting(
-				new BN(10 * anchor.web3.LAMPORTS_PER_SOL),
+				new BN(selectedTokenAmount * anchor.web3.LAMPORTS_PER_SOL),
 				start,
 				end,
 				true,
@@ -445,7 +532,7 @@ const SendContractTransaction = () => {
 				user: loadedProvider.wallet.publicKey,
 				userStats: userStatsPDA,
 				userToken: userToken.address,
-				recipient: recipient,
+				recipient: publicKeyRecipientAddress,
 				recipientToken: recipientToken.address,
 				feeToken: feeToken.address,
 				mint: mintAddressPubKey,
@@ -459,10 +546,6 @@ const SendContractTransaction = () => {
 			.signers([])
 			.rpc();
 		console.log('done!!');
-		console.log('Your transaction signature', tx);
-
-		await connection.confirmTransaction(signature, 'processed');
-		console.log('SIGNATURE', signature);
 
 		try {
 			const { data, error } = await supabase
@@ -482,12 +565,6 @@ const SendContractTransaction = () => {
 			// Show error toast message if submission fails
 			toast.error('Failed to submit lock. Please try again later.');
 		}
-		console.log(
-			'Time expire set:',
-			end,
-			'clock:',
-			anchor.web3.SYSVAR_CLOCK_PUBKEY
-		);
 	}
 
 	return (
@@ -610,11 +687,11 @@ const SendContractTransaction = () => {
 						<div className='flex justify-center'>
 							<input
 								type='text'
-								id='lockowner'
-								value={lockInfo.owner ? lockInfo.owner : ownerWallet}
-								onChange={(e) => handleChange(e, 'owner')}
+								id='recipient'
+								value={recipientAddress}
+								onChange={(e) => handleChange(e, 'recipient')}
 								className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-								placeholder='Owner Address'
+								placeholder='Lock Recipient Address'
 								required
 							/>
 						</div>
@@ -634,14 +711,12 @@ const SendContractTransaction = () => {
 							htmlFor='LockTime'
 							className='block mb-2 text-sm font-medium text-white dark:text-white'
 						>
-							Lock Date/Time
+							Lock END Date/Time (UTC)
 						</label>
 						<Flatpickr
 							id='lockdate'
-							value={lockInfo.date}
-							onChange={(date) =>
-								setLockInfo((prevState) => ({ ...prevState, date }))
-							}
+							value={endDate}
+							onChange={(e) => handleChange(e, 'lockdate')}
 							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
 							placeholder='Select Date and Time'
 							options={{
@@ -657,15 +732,18 @@ const SendContractTransaction = () => {
 						<input
 							type='submit'
 							id='submit'
-							onClick={(e) => onClickPreventDefault(e)}
+							onClick={(e) => {
+								onClickPreventDefault(e);
+								doVesting();
+							}}
 							className='bg-gradient-to-t from-[#1e4553] to-[#103642] border border-[#33788f] text-white uppercase text-base rounded-lg font-bold cursor-pointer focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
 							disabled={!publicKey}
 						/>
 					</div>
 				</form>
-				<button className='border' onClick={() => testDBSubmission()}>
+				{/* <button className='border' onClick={() => testDBSubmission()}>
 					Test DB Submisson
-				</button>
+				</button> */}
 			</div>
 			<div className='flex-col space-y-5 grow-0'>
 				<div className='grow-0 flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
@@ -673,8 +751,8 @@ const SendContractTransaction = () => {
 						lockInfo={lockInfo.lockName}
 						lockToken={lockInfo.token}
 						lockOwner={lockInfo.owner}
-						lockDate={lockInfo.date}
-						lockAmount={totalAvailableTokenAmount}
+						lockDate={lockInfo.endDate}
+						lockAmount={selectedTokenAmount}
 					/>
 				</div>
 				<div className=' grow-0 flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>

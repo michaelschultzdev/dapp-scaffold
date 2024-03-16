@@ -25,11 +25,11 @@ export default function CommDatails() {
 					<span>
 						Rate:{' '}
 						<span className='font-semibold text-gray-900 dark:text-white'>
-							<span className='line-through'>14%/Month</span> (Alpha-disabled)
+							<span className=''>14%/Month</span> (Alpha-disabled)
 						</span>
 					</span>
 				</li>
-				<li className='flex items-center space-x-3 rtl:space-x-reverse'>
+				{/* <li className='flex items-center space-x-3 rtl:space-x-reverse'>
 					<svg
 						className='flex-shrink-0 w-3.5 h-3.5 text-green-500 dark:text-green-400'
 						aria-hidden='true'
@@ -48,10 +48,10 @@ export default function CommDatails() {
 					<span>
 						Estimated Profit:{' '}
 						<span className='font-semibold text-gray-900 dark:text-white'>
-							<span className='line-through'>18 SOL</span> (Alpha-disabled)
+							<span className=''>18 SOL</span>
 						</span>
 					</span>
-				</li>
+				</li> */}
 				<li className='flex items-center space-x-3 rtl:space-x-reverse'>
 					<svg
 						className='flex-shrink-0 w-3.5 h-3.5 text-green-500 dark:text-green-400'
@@ -71,7 +71,7 @@ export default function CommDatails() {
 					<span>
 						Dropoff:{' '}
 						<span className='font-semibold text-gray-900 dark:text-white'>
-							<span className='line-through'>+10% / -10%</span> (Alpha-disabled)
+							<span className=''>+10% / -10%</span>
 						</span>
 					</span>
 				</li>
@@ -95,10 +95,9 @@ export default function CommDatails() {
 					<span>
 						Return Feature:{' '}
 						<span className='font-semibold text-gray-900 dark:text-white'>
-							<span className='line-through break-all'>
+							<span className=' break-all'>
 								Initial 1 SOL Lock + Staking Reward
 							</span>{' '}
-							(Alpha-disabled)
 						</span>
 					</span>
 				</li>
@@ -121,7 +120,7 @@ export default function CommDatails() {
 					<span>
 						Currency:{' '}
 						<span className='font-semibold text-gray-900 dark:text-white'>
-							<span className='line-through'>SOL</span> (Alpha-disabled)
+							<span className=''>SOL</span>
 						</span>
 					</span>
 				</li>
