@@ -165,8 +165,6 @@ const SendContractTransaction = () => {
 	const start = new BN(+new Date(startDate));
 	const end = new BN(+new Date(endDate));
 
-	let userdata;
-
 	const handleChange = (e, id) => {
 		let value = e.target ? e.target.value : e[0].toISOString();
 		if (id === 'lockName') {
@@ -238,84 +236,6 @@ const SendContractTransaction = () => {
 			startDate: new Date().toISOString(),
 		}));
 	}, []);
-
-	// Initialize the lock by creating a user stats account
-
-	const initializeLock = useCallback(async () => {
-		if (!loadedProvider) {
-			notify({ type: 'error', message: `Wallet not connected!` });
-			console.log('error', `Send Transaction: Wallet not connected!`);
-			return;
-		}
-
-		try {
-			const transaction = await program.methods
-				.initialize(new BN(1), new BN(3 * anchor.web3.LAMPORTS_PER_SOL))
-				.accounts({
-					baseAccount: baseAccount.publicKey,
-					owner: loadedProvider.wallet.publicKey,
-					feeAccount: feeAccount,
-					systemProgram: anchor.web3.SystemProgram.programId,
-				})
-				.signers([baseAccount])
-				.rpc();
-
-			// console.log('lewall', wallet);
-
-			notify({
-				type: 'success',
-				message: `Slot Reserved!`,
-				description: transaction,
-			});
-
-			// await web3.sendAndConfirmTransaction(connection, transaction, [
-			// 	baseAccount,
-			// ]);
-		} catch (error) {
-			console.log('error', `Transaction failed! ${error?.message}`);
-			notify({
-				type: 'error',
-				message: `Transaction failed!`,
-				description: error?.message,
-			});
-		}
-		createUserStats();
-	}, [loadedProvider]);
-
-	// Create user stats
-	const createUserStats = useCallback(async () => {
-		if (!loadedProvider) {
-			notify({ type: 'error', message: `Wallet not connected!` });
-			console.log('error', `Send Transaction: Wallet not connected!`);
-			return;
-		}
-
-		try {
-			const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
-				[
-					anchor.utils.bytes.utf8.encode('user-stats'),
-					loadedProvider.wallet.publicKey.toBuffer(),
-				],
-				program.programId
-			);
-
-			userdata = await program.methods
-				.createUserStats()
-				.accounts({
-					user: loadedProvider.wallet.publicKey,
-					userStats: userStatsPDA,
-					systemProgram: anchor.web3.SystemProgram.programId,
-				})
-				.rpc();
-		} catch (error) {
-			console.log('error', `Transaction failed! ${error?.message}`);
-			notify({
-				type: 'error',
-				message: `Transaction failed! This is expected if your wallet's slot already exists.`,
-				description: error?.message,
-			});
-		}
-	}, [loadedProvider]);
 
 	// Fetch the user's token accounts and store them in the tokens state
 	// Modify fetchTokensWithMetadata function to limit the number of tokens fetched
@@ -450,21 +370,31 @@ const SendContractTransaction = () => {
 			loadedProvider.wallet.publicKey
 		);
 
-		console.log('recipientToken', recipientToken);
+		// console.log('recipientToken', recipientToken);
 
-		console.log('feeAccount test first, this field should be a publicke.s...');
-		console.log(
-			'feeAccount test first, this field should be a publicke.s...',
-			feeAccount
-		);
+		// console.log('feeAccount test first, this field should be a publicke.s...');
+		// console.log(
+		// 	'feeAccount test first, this field should be a publicke.s...',
+		// 	feeAccount
+		// );
+
+		// console.log(
+		// 	'connection',
+		// 	connection,
+		// 	'baseAccount',
+		// 	baseAccount.publicKey,
+		// 	'mintAddressPubKey',
+		// 	mintAddressPubKey,
+		// 	'feeAccount',
+		// 	feeAccount
+		// );
 
 		const feeToken = await getOrCreateAssociatedTokenAccount(
 			connection,
-			baseAccount.publicKey,
+			baseAccount,
 			mintAddressPubKey,
 			feeAccount
 		);
-		console.log('feeToken', feeToken);
 
 		const userToken = await getOrCreateAssociatedTokenAccount(
 			connection,
@@ -475,52 +405,63 @@ const SendContractTransaction = () => {
 
 		let publicKeyRecipientAddress = new PublicKey(recipientAddress);
 
-		console.log(
-			'start',
-			start,
-			'end',
-			end,
-			'user',
-			loadedProvider.wallet.publicKey,
-			'userstats',
-			userStatsPDA,
-			'accounts',
-			{
-				user: loadedProvider.wallet.publicKey.toString(),
-				userStats: userStatsPDA.toString(),
-				userToken: userToken.address.toString(),
-				recipient: publicKeyRecipientAddress.toString(),
-				recipientToken: recipientToken.address.toString(),
-				feeToken: feeToken.address.toString(),
-				mint: mintAddressPubKey.toString(),
-				vault: vaultPDA.toString(),
-				clock: anchor.web3.SYSVAR_CLOCK_PUBKEY.toString(),
-				tokenProgram: TOKEN_PROGRAM_ID.toString(),
-				associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID.toString(),
-				baseAccount: baseAccount.publicKey.toString(),
-				feeAccount: feeAccount.toString(),
-				selectedTokenAmountNoLamports: new BN(selectedTokenAmount).toString(),
-				selectedTokenAmountLamports: new BN(
-					selectedTokenAmount * anchor.web3.LAMPORTS_PER_SOL
-				).toString(),
-			}
-		);
-		// console.log(publicKeyRecipientAddress);
-		// let tester = new PublicKey(ownerWallet.toString());
-		// console.log('fucked up owner wallet eh?', ownerWallet);
+		// console.log(
+		// 	'start',
+		// 	start,
+		// 	'end',
+		// 	end,
+		// 	'user',
+		// 	loadedProvider.wallet.publicKey,
+		// 	'userstats',
+		// 	userStatsPDA,
+		// 	'accounts',
+		// 	{
+		// 		user: loadedProvider.wallet.publicKey.toString(),
+		// 		userStats: userStatsPDA.toString(),
+		// 		userToken: userToken.address.toString(),
+		// 		recipient: publicKeyRecipientAddress.toString(),
+		// 		recipientToken: recipientToken.address.toString(),
+		// 		feeToken: feeToken.address.toString(),
+		// 		mint: mintAddressPubKey.toString(),
+		// 		vault: vaultPDA.toString(),
+		// 		clock: anchor.web3.SYSVAR_CLOCK_PUBKEY.toString(),
+		// 		tokenProgram: TOKEN_PROGRAM_ID.toString(),
+		// 		associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID.toString(),
+		// 		baseAccount: baseAccount.publicKey.toString(),
+		// 		feeAccount: feeAccount.toString(),
+		// 		selectedTokenAmountNoLamports: new BN(selectedTokenAmount).toString(),
+		// 		selectedTokenAmountLamports: new BN(
+		// 			selectedTokenAmount * anchor.web3.LAMPORTS_PER_SOL
+		// 		).toString(),
+		// 	}
+		// );
+		// // console.log(publicKeyRecipientAddress);
+		// // let tester = new PublicKey(ownerWallet.toString());
+		// // console.log('fucked up owner wallet eh?', ownerWallet);
 
-		console.log(
-			'start',
-			start,
-			'end',
-			end,
-			'user',
-			loadedProvider.wallet.publicKey,
-			'userstats',
-			userStatsPDA
-		);
+		// console.log(
+		// 	'start',
+		// 	start,
+		// 	'end',
+		// 	end,
+		// 	'user',
+		// 	loadedProvider.wallet.publicKey,
+		// 	'userstats',
+		// 	userStatsPDA
+		// );
 
-		const tx = await program.methods
+		const initial = await program.methods
+			.initialize(new BN(1), new BN(3 * anchor.web3.LAMPORTS_PER_SOL))
+			.accounts({
+				baseAccount: baseAccount.publicKey,
+				owner: loadedProvider.wallet.publicKey,
+				feeAccount: feeAccount,
+				systemProgram: anchor.web3.SystemProgram.programId,
+			})
+			.signers([baseAccount])
+			.rpc();
+
+		const transac = await program.methods
 			.createVesting(
 				new BN(selectedTokenAmount * anchor.web3.LAMPORTS_PER_SOL),
 				start,
@@ -545,6 +486,16 @@ const SendContractTransaction = () => {
 			})
 			.signers([])
 			.rpc();
+
+		let tx = new Transaction(transac);
+		tx.add(await initial);
+		tx.add(await transac);
+		// tx.add(await userdata);
+
+		console.log('pre-done!');
+
+		await program.provider.sendAndConfirm(tx, [baseAccount]);
+
 		console.log('done!!');
 
 		try {

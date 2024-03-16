@@ -148,7 +148,7 @@ export default function Details({
 						<span>
 							Lock Cost:{' '}
 							<span className='font-semibold text-gray-900 dark:text-white'>
-								(Free during Alpha Release)
+								1.5 SOL
 							</span>
 						</span>
 					</li>
@@ -172,7 +172,7 @@ export default function Details({
 							Features:{' '}
 							<span className='font-semibold text-gray-900 dark:text-white'>
 								Free Relock, <br />
-								Staking Rewards - (After Alpha Release)
+								Staking Rewards
 							</span>
 						</span>
 					</li>
