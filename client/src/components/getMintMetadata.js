@@ -13,11 +13,11 @@ async function getTokenMetadata(mintaddy) {
 		mintAddress = new PublicKey(mintaddy);
 	}
 
-	console.log('There is a mint address, if it ends in Tw2U, it is not pulling the actual mint address from the user wallet: ', mintAddress.toString());
+	// console.log('There is a mint address, if it ends in Tw2U, it is not pulling the actual mint address from the user wallet: ', mintAddress.toString());
 
 	let tokenName;
 	let tokenSymbol;
-	let tokenLogo;
+	// let tokenLogo;
 
 	const metadataAccount = metaplex
 		.nfts()
@@ -34,7 +34,7 @@ async function getTokenMetadata(mintaddy) {
 			.findByMint({ mintAddress: mintAddress });
 		tokenName = token.name;
 		tokenSymbol = token.symbol;
-		tokenLogo = token.json?.image;
+		// tokenLogo = token.json?.image;
 	} else {
 		const provider = await new TokenListProvider().resolve();
 		const tokenList = provider.filterByChainId(ENV.MainnetBeta).getList();
@@ -50,12 +50,12 @@ async function getTokenMetadata(mintaddy) {
 			return {
 				name: 'Unknown',
 				symbol: 'UNK',
-				logo: 'https://cdn.discordapp.com/attachments/893341080289482516/893341107606745866/unknown.png'
+				// logo: 'https://cdn.discordapp.com/attachments/893341080289482516/893341107606745866/unknown.png'
 			};
 		} else {
 			tokenName = token.name;
 			tokenSymbol = token.symbol;
-			tokenLogo = token.logoURI;
+			// tokenLogo = token.logoURI;
 		}
 	}
 
@@ -63,7 +63,7 @@ async function getTokenMetadata(mintaddy) {
 	return {
 		tokenName: tokenName,
 		symbol: tokenSymbol,
-		logo: tokenLogo
+		// logo: tokenLogo
 	};
 }
 

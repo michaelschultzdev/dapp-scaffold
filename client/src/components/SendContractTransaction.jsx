@@ -62,11 +62,11 @@ const SendContractTransaction = () => {
 
 	const [tokens, setTokens] = useState([]);
 	const [selectedToken, setSelectedToken] = useState('');
-	const [selectedTokenAccount, setSelectedTokenAccount] = useState('');
+	const [lockName, setLockName] = useState('');
 	const [tokenAccount, setTokenAccount] = useState('');
 	const [selectedTokenAmount, setSelectedTokenAmount] = useState(0);
 	const [totalAvailableTokenAmount, setTotalAvailableTokenAmount] = useState(0);
-	const [ownerWallet, setOwnerWallet] = useState('');
+	const [ownerWallet, setOwnerWallet] = useState();
 	const [selectedDecimals, setSelectedTokenDecimals] = useState('');
 	const [tokensWithMetadata, setTokensWithMetadata] = useState([]);
 
@@ -74,18 +74,16 @@ const SendContractTransaction = () => {
 	const [metadata, setMetadata] = useState({
 		tokenName: '',
 		symbol: '',
-		logo: '',
 	});
 
 	const [lockInfo, setLockInfo] = useState({
 		lockName: '',
-		token: '',
+		tokenAddress: '',
 		owner: '',
 		amount: 0,
 		decimals: '',
 		tokenName: '',
 		symbol: '',
-		logo: null,
 		date: null,
 	});
 
@@ -93,8 +91,16 @@ const SendContractTransaction = () => {
 	const network = networkConfiguration;
 	const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 	const connection = useMemo(() => new Connection(endpoint), [endpoint]);
-	console.log;
 	const programID = new PublicKey(idl.metadata.address);
+
+	// Prevent form submission refresh
+	function formPreventDefault(e) {
+		e.preventDefault();
+	}
+
+	function onClickPreventDefault(e) {
+		e.preventDefault();
+	}
 
 	// const wallet = useWallet();
 	const wallet = useWallet();
@@ -117,7 +123,10 @@ const SendContractTransaction = () => {
 	}, [provider.wallet]);
 
 	useEffect(() => {
-		if (loadedProvider) console.log('Connected to provider.');
+		if (loadedProvider) {
+			console.log('Connected to provider.');
+			setOwnerWallet(loadedProvider.wallet.publicKey.toBase58());
+		}
 	}, [loadedProvider]);
 
 	useEffect(() => {
@@ -147,7 +156,10 @@ const SendContractTransaction = () => {
 
 	const handleChange = (e, id) => {
 		let value = e.target ? e.target.value : e[0].toISOString();
-		// Check if the field being changed is "owner"
+		if (id === 'lockName') {
+			// Update ownerWallet state as well
+			setLockName(value);
+		}
 		if (id === 'owner') {
 			// Update ownerWallet state as well
 			setOwnerWallet(value);
@@ -174,25 +186,24 @@ const SendContractTransaction = () => {
 		setSelectedTokenDecimals(selectedToken ? selectedToken.decimals : ''); // Update selected decimals
 		setSelectedTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
 		setTotalAvailableTokenAmount(selectedToken ? selectedToken.amount : ''); // Update selected amount
+		setTokenAccount(selectedToken ? selectedToken.address : ''); // Update selected amount
 
 		if (selectedToken && selectedToken.metadata) {
 			setMetadata({
 				tokenName: selectedToken.metadata.name,
 				symbol: selectedToken.metadata.symbol,
-				logo: selectedToken.metadata.logo,
 			});
 		}
 
 		// Update lockInfo state with the selected token address and decimals
 		setLockInfo((prevState) => ({
 			...prevState,
-			token: tokenAccount,
+			tokenAddress: tokenAccount,
 			mint: selectedTokenAddress,
 			owner: ownerWallet,
 			amount: selectedTokenAmount,
 			tokenName: selectedToken ? selectedToken.metadata.name : '',
 			symbol: selectedToken ? selectedToken.metadata.symbol : '',
-			logo: selectedToken ? selectedToken.metadata.logo : null,
 			decimals: selectedToken ? selectedToken.decimals : '', // Update decimals in lockInfo
 		}));
 	};
@@ -291,7 +302,6 @@ const SendContractTransaction = () => {
 	// Modify fetchTokensWithMetadata function to limit the number of tokens fetched
 	useEffect(() => {
 		if (!loadedProvider) return;
-
 		const fetchTokensWithMetadata = async () => {
 			try {
 				const tokenAccounts = await connection.getParsedTokenAccountsByOwner(
@@ -299,63 +309,45 @@ const SendContractTransaction = () => {
 					{ programId: TOKEN_PROGRAM_ID }
 				);
 
+				// Limit the number of tokens fetched to 5
+				const tokenAccountsLimited = tokenAccounts.value.slice(0, 1);
+
 				const uniqueTokens = new Set();
 
-				// Split token accounts into batches of 5
-				const tokenAccountBatches = Array.from(
-					{ length: Math.ceil(tokenAccounts.length / 5) },
-					(_, index) => tokenAccounts.slice(index * 5, (index + 1) * 5)
-				);
+				for (const { pubkey, account } of tokenAccountsLimited) {
+					const MY_WALLET_ADDRESS = loadedProvider.wallet.publicKey.toString();
 
-				for (const tokenAccountBatch of tokenAccountBatches) {
-					const batchPromises = tokenAccountBatch.map(
-						async ({ pubkey, account }) => {
-							const MY_WALLET_ADDRESS =
-								loadedProvider.wallet.publicKey.toString();
-
-							const accounts = await connection.getParsedProgramAccounts(
-								TOKEN_PROGRAM_ID,
+					const accounts = await connection.getParsedProgramAccounts(
+						TOKEN_PROGRAM_ID,
+						{
+							filters: [
 								{
-									filters: [
-										{
-											dataSize: 165,
-										},
-										{
-											memcmp: {
-												offset: 32,
-												bytes: MY_WALLET_ADDRESS,
-											},
-										},
-									],
-								}
-							);
-
-							accounts.forEach((account, i) => {
-								const token = {
-									address: pubkey.toBase58(),
-									mint: account.account.data.parsed.info.mint,
-									amount: account.account.data.parsed.info.tokenAmount.uiAmount,
-									decimals:
-										account.account.data.parsed.info.tokenAmount.decimals,
-								};
-								uniqueTokens.add(token);
-							});
+									dataSize: 165,
+								},
+								{
+									memcmp: {
+										offset: 32,
+										bytes: MY_WALLET_ADDRESS,
+									},
+								},
+							],
 						}
 					);
 
-					// Execute batch promises concurrently
-					await Promise.allSettled(batchPromises);
-
-					// Introduce a delay between batches
-					await new Promise((resolve) => setTimeout(resolve, 2000));
+					accounts.forEach((account, i) => {
+						const token = {
+							address: pubkey.toBase58(),
+							mint: account.account.data.parsed.info.mint,
+							amount: account.account.data.parsed.info.tokenAmount.uiAmount,
+							decimals: account.account.data.parsed.info.tokenAmount.decimals,
+						};
+						uniqueTokens.add(token);
+					});
 				}
-
-				console.log(uniqueTokens, 'uniqueTokens');
 
 				const tokensWithMetadata = await Promise.all(
 					Array.from(uniqueTokens).map(async (token) => {
 						if (token.mint) {
-							console.log('WE GOT A MINT', token.mint.toString());
 							const metadata = await getTokenMetadata(token.mint.toString()); // Fetch metadata for each token
 							return {
 								...token,
@@ -383,14 +375,7 @@ const SendContractTransaction = () => {
 		};
 
 		fetchTokensWithMetadata();
-	}, [
-		loadedProvider,
-		tokenAccount,
-		ownerWallet,
-		selectedTokenAmount,
-		selectedDecimals,
-	]);
-
+	}, [loadedProvider, selectedTokenAmount, selectedDecimals]);
 	// Get the user's selected token and extract the mint address
 
 	useEffect(() => {
@@ -399,10 +384,20 @@ const SendContractTransaction = () => {
 		async function getMintData() {
 			setMintAddressPubKey(selectedToken.mint);
 		}
-		c;
 		getMintData();
 	}, [selectedToken]);
 	// Commmand to run the vesting after all else is completed
+
+	// Test the submission of all fields to database
+	// async function testDBSubmission() {
+	// 	const { data, error } = await supabase
+	// 		.from('AlphaSubmissions')
+	// 		.insert([lockInfo]);
+	// 	if (error) {
+	// 		throw error;
+	// 	}
+	// 	notify({ type: 'success', message: `Lock stored successfully!` });
+	// }
 
 	async function doVesting() {
 		const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
@@ -465,6 +460,28 @@ const SendContractTransaction = () => {
 			.rpc();
 		console.log('done!!');
 		console.log('Your transaction signature', tx);
+
+		await connection.confirmTransaction(signature, 'processed');
+		console.log('SIGNATURE', signature);
+
+		try {
+			const { data, error } = await supabase
+				.from('AlphaSubmissions')
+				.insert([lockInfo]);
+			if (error) {
+				throw error;
+			}
+			// Show success toast message
+			toast.success('Lock submitted successfully!');
+			// Redirect to "/all-locks" after a short delay
+			setTimeout(() => {
+				router.push('/all-locks');
+			}, 2000); // 2000 milliseconds = 2 seconds
+		} catch (error) {
+			console.error('Error submitting data:', error.message);
+			// Show error toast message if submission fails
+			toast.error('Failed to submit lock. Please try again later.');
+		}
 		console.log(
 			'Time expire set:',
 			end,
@@ -506,7 +523,7 @@ const SendContractTransaction = () => {
 					is immutable once submitted. The lock will be tied to the expiration
 					date, which once set cannot be unlocked by anyone for any reason.
 				</p>
-				<form className='mt-5'>
+				<form className='mt-5' onSubmit={(e) => formPreventDefault(e)}>
 					<div className='mb-5'>
 						<label
 							htmlFor='name'
@@ -516,9 +533,9 @@ const SendContractTransaction = () => {
 						</label>
 						<input
 							type='text'
-							id='lockname'
-							value={lockInfo.user}
-							onChange={(e) => handleChange(e, 'name')}
+							id='lockName'
+							value={lockName}
+							onChange={(e) => handleChange(e, 'lockName')}
 							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
 							placeholder='Token LP Lock'
 							required
@@ -542,7 +559,7 @@ const SendContractTransaction = () => {
 							{tokensWithMetadata.map((token) => (
 								<option key={token.mint} value={token.mint}>
 									{token.metadata
-										? `${token.metadata.name} (${token.metadata.symbol})`
+										? `${token.address} (${token.metadata.symbol})`
 										: token.mint}
 								</option>
 							))}
@@ -587,13 +604,14 @@ const SendContractTransaction = () => {
 							htmlFor='owner'
 							className='block mb-2 text-sm font-medium text-white dark:text-white'
 						>
-							Lock Owner
+							Unlock Recipient (The wallet that will receive the tokens once
+							they're unlocked)
 						</label>
 						<div className='flex justify-center'>
 							<input
 								type='text'
 								id='lockowner'
-								value={lockInfo.owner}
+								value={lockInfo.owner ? lockInfo.owner : ownerWallet}
 								onChange={(e) => handleChange(e, 'owner')}
 								className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
 								placeholder='Owner Address'
@@ -639,11 +657,15 @@ const SendContractTransaction = () => {
 						<input
 							type='submit'
 							id='submit'
+							onClick={(e) => onClickPreventDefault(e)}
 							className='bg-gradient-to-t from-[#1e4553] to-[#103642] border border-[#33788f] text-white uppercase text-base rounded-lg font-bold cursor-pointer focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
 							disabled={!publicKey}
 						/>
 					</div>
 				</form>
+				<button className='border' onClick={() => testDBSubmission()}>
+					Test DB Submisson
+				</button>
 			</div>
 			<div className='flex-col space-y-5 grow-0'>
 				<div className='grow-0 flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
