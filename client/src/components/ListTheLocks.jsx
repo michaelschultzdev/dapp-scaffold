@@ -59,9 +59,8 @@ const ListTheLocks = () => {
 	const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 	const connection = useMemo(() => new Connection(endpoint), [endpoint]);
 	const programID = new PublicKey(idl.metadata.address);
-	const baseAccount = anchor.web3.Keypair.generate();
 	const [mintAddressPubKey, setMintAddressPubKey] = useState(
-		new PublicKey('CLaSKXbuMp1BXTya62WDyZoPvgmfcqsdA18rAjBcn9Vw') // set to the SolFi token address bc I can't think of any other
+		new PublicKey('CLaSKXbuMp1BXTya62WDyZoPvgmfcqsdA18rAjBcn9Vw') // This can be whatever because it gets replaced. set to the SolFi token address bc I can't think of any other
 	);
 
 	function truncate(str) {
@@ -161,21 +160,34 @@ const ListTheLocks = () => {
 		amount
 	) {
 		// console.log('BASE??', baseAccountAddress);
-		console.log('imported pda', pdaAddress);
-		console.log('imported vault', vaultAddress);
+		// console.log('imported pda', pdaAddress);
+		// console.log('imported vault', vaultAddress);
 
 		let mint = new PublicKey(mintaddress);
 		let recipient = new PublicKey(recipientaddress);
 		let vaultPDA = new PublicKey(vaultAddress);
 
-		console.log('imported recipient', recipient);
+		// console.log('imported recipient', recipient);
+
+		// const formattedData = JSON.parse(baseAccountAddress.toString());
+		// const secretKeyArray = Object.values(formattedData._keypair.secretKey);
+		// const secretKeyUint8 = Uint8Array.from(secretKeyArray);
+		// const baseAccount = anchor.web3.Keypair.fromSecretKey(secretKeyUint8);
+
+		// console.log(base);
+
+		// const baseAccount = anchor.web3.Keypair.fromSecretKey(
+		// 	Uint8Array.from(formattedData)
+		// );
+
+		// console.log('formattedData after keypair call', baseAccount);
 
 		let baseAccount = new PublicKey(baseAccountAddress);
 		// let userStatsPDA = new PublicKey(pdaAddress);
 		// let vaultPDA = new PublicKey(vaultAddress);
 		// const baseAccount = anchor.web3.Keypair.generate();
-		console.log('passed in baseAccountAddress', baseAccountAddress);
-		console.log('now active base', baseAccount);
+		// console.log('passed in baseAccountAddress', baseAccountAddress);
+		// console.log('now active base', baseAccount);
 
 		try {
 			// Function to unlock tokens
@@ -199,6 +211,31 @@ const ListTheLocks = () => {
 				mint,
 				recipient
 			);
+
+			console.log(userStatsPDA.toString());
+
+			// !!! We can use this to check the vesting info of the user, so we know what the start time and end time are before it goes into the program to unlock the tokens.
+
+			async function getUsrData(address) {
+				console.log(address);
+				try {
+					const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
+						[anchor.utils.bytes.utf8.encode('user-stats'), address.toBuffer()],
+						program.programId
+					);
+
+					const account = await program.account.userStats.fetch(userStatsPDA);
+					console.log('Vesting Info:', account);
+					console.log('Vesting start:', account.vestList[0].startTs.toString());
+					console.log('Vesting end:', account.vestList[0].endTs.toString());
+					// Now you have the vesting info, you can use it as needed
+				} catch (error) {
+					console.error('Error getting user data:', error.message);
+					// Handle error
+				}
+			}
+
+			getUsrData(loadedProvider.wallet.publicKey);
 
 			const tx = await program.methods
 				.unlock(

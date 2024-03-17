@@ -2,9 +2,9 @@
 seeds = false
 skip-lint = false
 [programs.localnet]
-token_locker = "7M9PoX5GMSTrR5AeiugKD3Kzrt51vLoqNzvJYiS8wdZm"
+token_locker = "ArffnQbDrBUG4zADP9trjUTrsjmmt5n4WFzSrS9gEo5N"
 [programs.devnet]
-token_locker = "7M9PoX5GMSTrR5AeiugKD3Kzrt51vLoqNzvJYiS8wdZm"
+token_locker = "ArffnQbDrBUG4zADP9trjUTrsjmmt5n4WFzSrS9gEo5N"
 
 [registry]
 url = "https://api.apr.dev"

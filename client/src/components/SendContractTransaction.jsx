@@ -72,8 +72,8 @@ const SendContractTransaction = () => {
 	const [totalAvailableTokenAmount, setTotalAvailableTokenAmount] = useState(0);
 	const [ownerWallet, setOwnerWallet] = useState('');
 	const [selectedDecimals, setSelectedTokenDecimals] = useState('');
-	const [endDate, setEndDate] = useState(new Date().toISOString());
-	const [startDate, setStartDate] = useState(new Date().toISOString());
+	const [endDate, setEndDate] = useState();
+	const [startDate, setStartDate] = useState();
 	const [tokensWithMetadata, setTokensWithMetadata] = useState([]);
 	const [recipientAddress, setRecipientAddress] = useState('');
 	const [baseAccount, setBaseAccount] = useState(genBase);
@@ -81,6 +81,7 @@ const SendContractTransaction = () => {
 	const [mintAddressPubKey, setMintAddressPubKey] = useState(
 		new PublicKey('CLaSKXbuMp1BXTya62WDyZoPvgmfcqsdA18rAjBcn9Vw') // set to the SolFi token address bc I can't think of any other
 	);
+
 	const [metadata, setMetadata] = useState({
 		tokenName: '',
 		symbol: '',
@@ -180,12 +181,13 @@ const SendContractTransaction = () => {
 
 	const userToken = useRef(null);
 
-	// const start = new BN(+new Date('2024-03-12T01:24:00'));
+	const start = new BN(+new Date('2024-03-12T01:24:00'));
 	// const end = new BN(+new Date('2024-03-14T12:24:00'));
 	// console.log('start:', startDate, 'end:', endDate);
 
-	const start = new BN(+new Date(startDate));
-	const end = new BN(+new Date(endDate));
+	// const start = new BN(+new Date(startDate));
+
+	const end = new BN(+new Date('2024-03-14T12:24:00')); //a few days ago it ended, the date shown on the listlocks page is wrong on purpose
 
 	const handleChange = (e, id) => {
 		let value = e.target ? e.target.value : e[0].toISOString();
@@ -255,7 +257,7 @@ const SendContractTransaction = () => {
 	useEffect(() => {
 		setLockInfo((prevState) => ({
 			...prevState,
-			startDate: new Date().toISOString(),
+			startDate: start,
 		}));
 	}, []);
 
@@ -502,7 +504,7 @@ const SendContractTransaction = () => {
 		// );
 
 		const initial = await program.methods
-			.initialize(new BN(1), new BN(3 * anchor.web3.LAMPORTS_PER_SOL))
+			.initialize(new BN(1), new BN(1.5 * anchor.web3.LAMPORTS_PER_SOL))
 			.accounts({
 				baseAccount: baseAccount.publicKey,
 				owner: loadedProvider.wallet.publicKey,
