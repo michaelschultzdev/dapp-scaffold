@@ -73,6 +73,9 @@ const SendContractTransaction = () => {
 	const [startDate, setStartDate] = useState(new Date().toISOString());
 	const [tokensWithMetadata, setTokensWithMetadata] = useState([]);
 	const [recipientAddress, setRecipientAddress] = useState('');
+	const [baseAccount, setBaseAccount] = useState(
+		new PublicKey('CLaSKXbuMp1BXTya62WDyZoPvgmfcqsdA18rAjBcn9Vw')
+	);
 
 	const [mintAddressPubKey, setMintAddressPubKey] = useState(
 		new PublicKey('CLaSKXbuMp1BXTya62WDyZoPvgmfcqsdA18rAjBcn9Vw') // set to the SolFi token address bc I can't think of any other
@@ -92,6 +95,9 @@ const SendContractTransaction = () => {
 		symbol: '',
 		startDate: null,
 		endDate: null,
+		baseAccount: '',
+		userStatsPDA: '',
+		vaultPDA: '',
 	});
 
 	const { networkConfiguration } = useNetworkConfiguration();
@@ -115,6 +121,13 @@ const SendContractTransaction = () => {
 
 	// const wallet = useWallet();
 	const wallet = useWallet();
+
+	useEffect(() => {
+		if (!loadedProvider) return;
+		let genBase = anchor.web3.Keypair.generate();
+		setBaseAccount(genBase);
+		console.log('BASE ACCOUNT:', baseAccount.publicKey.toString());
+	}, [loadedProvider]);
 
 	const provider = new AnchorProvider(connection, wallet, {
 		commitment: 'processed',
@@ -142,6 +155,17 @@ const SendContractTransaction = () => {
 	}, [loadedProvider]);
 
 	useEffect(() => {
+		if (!loadedProvider) return;
+
+		setLockInfo((prevState) => ({
+			...prevState,
+			baseAccount: baseAccount,
+		}));
+
+		console.log('BASE ACCOUNT USEEFFECTED INTO THE LOCK INFO:', lockInfo);
+	}, []);
+
+	useEffect(() => {
 		async function fetchMetadata() {
 			const metadata = await getTokenMetadata(mintAddressPubKey);
 			setMetadata(metadata);
@@ -154,8 +178,6 @@ const SendContractTransaction = () => {
 		'FX9yNH3yRMUvmW5UASJ7nsQpnXvEhHF3i2xMBppwuU7t'
 	);
 
-	// const program = new Program(idl, programID, connection);
-	const baseAccount = anchor.web3.Keypair.generate();
 	const userToken = useRef(null);
 
 	// const start = new BN(+new Date('2024-03-12T01:24:00'));
@@ -354,14 +376,10 @@ const SendContractTransaction = () => {
 			program.programId
 		);
 
-		console.log('userStatsPDA', userStatsPDA);
-
 		const [vaultPDA, nonce] = PublicKey.findProgramAddressSync(
 			[baseAccount.publicKey.toBuffer()],
 			program.programId
 		);
-
-		console.log('vaultPDA', vaultPDA);
 
 		const recipientToken = await getOrCreateAssociatedTokenAccount(
 			connection,
@@ -461,6 +479,22 @@ const SendContractTransaction = () => {
 			.signers([baseAccount])
 			.rpc();
 
+		let userdata;
+		try {
+			userdata = await program.methods
+				.createUserStats()
+				.accounts({
+					user: loadedProvider.wallet.publicKey,
+					userStats: userStatsPDA,
+					systemProgram: anchor.web3.SystemProgram.programId,
+				})
+				.rpc();
+		} catch (error) {
+			console.error('Error creating the real user stats:', error);
+			// Handle the error as per your requirements, for example:
+			// notify({ type: 'error', message: 'Error creating user stats' });
+		}
+
 		const transac = await program.methods
 			.createVesting(
 				new BN(selectedTokenAmount * anchor.web3.LAMPORTS_PER_SOL),
@@ -487,15 +521,6 @@ const SendContractTransaction = () => {
 			.signers([])
 			.rpc();
 
-		let tx = new Transaction(transac);
-		tx.add(await initial);
-		tx.add(await transac);
-		// tx.add(await userdata);
-
-		console.log('pre-done!');
-
-		await program.provider.sendAndConfirm(tx, [baseAccount]);
-
 		console.log('done!!');
 
 		try {
@@ -506,15 +531,24 @@ const SendContractTransaction = () => {
 				throw error;
 			}
 			// Show success toast message
-			toast.success('Lock submitted successfully!');
+			notify({
+				type: 'success',
+				message: `Tokens are locked!`,
+				description:
+					'You will be redirected to the locked tokens page shortly.',
+			});
 			// Redirect to "/all-locks" after a short delay
 			setTimeout(() => {
-				router.push('/all-locks');
+				router.push('/listlocks');
 			}, 2000); // 2000 milliseconds = 2 seconds
 		} catch (error) {
 			console.error('Error submitting data:', error.message);
 			// Show error toast message if submission fails
-			toast.error('Failed to submit lock. Please try again later.');
+			notify({
+				type: 'error',
+				message: `We had a problem!`,
+				description: error.message,
+			});
 		}
 	}
 
@@ -525,183 +559,166 @@ const SendContractTransaction = () => {
 				<hr className='border-[#1e4957] pb-1 mt-5' />
 
 				<div className='mb-10 mt-5'>
-					<h2 className='text-2xl text-white pb-0 mb-5'>Step 1:</h2>
+					<h2 className='text-2xl text-white pb-0 mb-3'>
+						Start Earning APY With Locked LP Tokens!
+					</h2>
 					<p className='mb-5 lg:max-w-4xl'>
-						Make sure the wallet you wish to lock with is connected, then press
-						the Reserve Slot button to create a space especially for your lock.
-						You will see two transactions happen, and each will cost a very
-						small amount of SOL.
+						Enter your lock information below. Be sure to double-check it, as it
+						is immutable once submitted. The lock will be tied to the expiration
+						date, which once set cannot be unlocked by anyone for any reason.
 					</p>
-					<button
-						className='px-10 sm:w-full py-3 bg-gradient-to-b rounded from-[#5892a5] to-[#095670] items-center'
-						onClick={() => initializeLock()}
-					>
-						Reserve Slot
-					</button>
-					{/* <button
-						className='px-10 sm:w-full py-3 bg-gradient-to-b rounded from-[#5892a5] to-[#095670] items-center'
-						onClick={() => createUserStats()}
-					>
-						User Data
-					</button> */}
-				</div>
-				<h2 className='text-2xl text-white pb-0 mb-3'>Step 2:</h2>
-				<p className='mb-5 lg:max-w-4xl'>
-					Enter your lock information below. Be sure to double-check it, as it
-					is immutable once submitted. The lock will be tied to the expiration
-					date, which once set cannot be unlocked by anyone for any reason.
-				</p>
-				<form className='mt-5' onSubmit={(e) => formPreventDefault(e)}>
-					<div className='mb-5'>
-						<label
-							htmlFor='name'
-							className='block mb-2 text-sm font-medium text-gray-900 dark:text-white'
-						>
-							Lock Name
-						</label>
+					<form className='mt-5' onSubmit={(e) => formPreventDefault(e)}>
+						<div className='mb-5'>
+							<label
+								htmlFor='name'
+								className='block mb-2 text-sm font-medium text-gray-900 dark:text-white'
+							>
+								Lock Name
+							</label>
+							<input
+								type='text'
+								id='lockName'
+								value={lockName}
+								onChange={(e) => handleChange(e, 'lockName')}
+								className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
+								placeholder='Token LP Lock'
+								required
+							/>
+						</div>
+						<div className='mb-5'>
+							<label
+								htmlFor='token'
+								className='block mb-2 text-sm font-medium text-white dark:text-white'
+							>
+								Select Your Token
+							</label>
+
+							<select
+								id='token'
+								value={selectedToken}
+								onChange={handleTokenChange}
+								className='minimal bg-[#1e4957] border border-[#346b7d] text-gray-200 text-sm rounded-lg focus:ring-[#1e4957] focus:border-[#1e4957] block w-full p-2.5 disabled:text-slate-500'
+							>
+								<option value=''>-- Select a token --</option>
+								{tokensWithMetadata.map((token) => (
+									<option key={token.mint} value={token.mint}>
+										{token.metadata
+											? `${token.mint} (${token.metadata.symbol})`
+											: token.mint}
+									</option>
+								))}
+							</select>
+						</div>
+						<div className='mb-5'>
+							<label
+								htmlFor='amount'
+								className='block mb-2 text-sm font-medium text-gray-900 dark:text-white'
+							>
+								Lock Amount
+								{totalAvailableTokenAmount ? (
+									<span className=''>
+										{' '}
+										- ({totalAvailableTokenAmount} available)
+									</span>
+								) : (
+									''
+								)}
+							</label>
+							<div className='flex items-center justify-center'>
+								<input
+									type='text'
+									id='lockamount'
+									value={selectedTokenAmount}
+									onChange={(e) => handleChange(e, 'amount')}
+									className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
+									placeholder='0'
+									required
+								/>
+								<a
+									href='#'
+									onClick={handleMaxAmount}
+									className=' text-sm uppercase font-bold ml-2 tecen bg-[#14333d] border border-[#317186] text-white rounded-lg focus:ring-[#4096b3] focus:border-[#5fafc9] w-28 text-center py-2.5 px-2.5'
+								>
+									use max
+								</a>
+							</div>
+						</div>
+						<div className='mb-4'>
+							<label
+								htmlFor='owner'
+								className='block mb-2 text-sm font-medium text-white dark:text-white'
+							>
+								Unlock Recipient (The wallet that will receive the tokens once
+								they're unlocked)
+							</label>
+							<div className='flex justify-center'>
+								<input
+									type='text'
+									id='recipient'
+									value={recipientAddress}
+									onChange={(e) => handleChange(e, 'recipient')}
+									className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
+									placeholder='Lock Recipient Address'
+									required
+								/>
+							</div>
+						</div>
+
 						<input
 							type='text'
-							id='lockName'
-							value={lockName}
-							onChange={(e) => handleChange(e, 'lockName')}
-							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-							placeholder='Token LP Lock'
-							required
+							hidden
+							id='decimals'
+							value={selectedDecimals}
+							onChange={(e) => handleChange(e, 'decimals')}
+							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 w-full p-2.5 hidden'
 						/>
-					</div>
-					<div className='mb-5'>
-						<label
-							htmlFor='token'
-							className='block mb-2 text-sm font-medium text-white dark:text-white'
-						>
-							Select Your Token
-						</label>
 
-						<select
-							id='token'
-							value={selectedToken}
-							onChange={handleTokenChange}
-							className='minimal bg-[#1e4957] border border-[#346b7d] text-gray-200 text-sm rounded-lg focus:ring-[#1e4957] focus:border-[#1e4957] block w-full p-2.5 disabled:text-slate-500'
-						>
-							<option value=''>-- Select a token --</option>
-							{tokensWithMetadata.map((token) => (
-								<option key={token.mint} value={token.mint}>
-									{token.metadata
-										? `${token.address} (${token.metadata.symbol})`
-										: token.mint}
-								</option>
-							))}
-						</select>
-					</div>
-					<div className='mb-5'>
-						<label
-							htmlFor='amount'
-							className='block mb-2 text-sm font-medium text-gray-900 dark:text-white'
-						>
-							Lock Amount
-							{totalAvailableTokenAmount ? (
-								<span className=''>
-									{' '}
-									- ({totalAvailableTokenAmount} available)
-								</span>
-							) : (
-								''
-							)}
-						</label>
-						<div className='flex items-center justify-center'>
-							<input
-								type='text'
-								id='lockamount'
-								value={selectedTokenAmount}
-								onChange={(e) => handleChange(e, 'amount')}
-								className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-								placeholder='0'
-								required
-							/>
-							<a
-								href='#'
-								onClick={handleMaxAmount}
-								className=' text-sm uppercase font-bold ml-2 tecen bg-[#14333d] border border-[#317186] text-white rounded-lg focus:ring-[#4096b3] focus:border-[#5fafc9] w-28 text-center py-2.5 px-2.5'
+						<div className='' suppressHydrationWarning>
+							<label
+								htmlFor='LockTime'
+								className='block mb-2 text-sm font-medium text-white dark:text-white'
 							>
-								use max
-							</a>
-						</div>
-					</div>
-					<div className='mb-4'>
-						<label
-							htmlFor='owner'
-							className='block mb-2 text-sm font-medium text-white dark:text-white'
-						>
-							Unlock Recipient (The wallet that will receive the tokens once
-							they're unlocked)
-						</label>
-						<div className='flex justify-center'>
-							<input
-								type='text'
-								id='recipient'
-								value={recipientAddress}
-								onChange={(e) => handleChange(e, 'recipient')}
+								Lock END Date/Time (UTC)
+							</label>
+							<Flatpickr
+								id='lockdate'
+								value={endDate}
+								onChange={(e) => handleChange(e, 'lockdate')}
 								className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-								placeholder='Lock Recipient Address'
+								placeholder='Select Date and Time'
+								options={{
+									enableTime: true,
+									altInput: true,
+									altFormat: 'F j, Y h:i K',
+									dateFormat: 'Y-m-d H:i:S',
+								}}
 								required
 							/>
 						</div>
-					</div>
-
-					<input
-						type='text'
-						hidden
-						id='decimals'
-						value={selectedDecimals}
-						onChange={(e) => handleChange(e, 'decimals')}
-						className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 w-full p-2.5 hidden'
-					/>
-
-					<div className='' suppressHydrationWarning>
-						<label
-							htmlFor='LockTime'
-							className='block mb-2 text-sm font-medium text-white dark:text-white'
-						>
-							Lock END Date/Time (UTC)
-						</label>
-						<Flatpickr
-							id='lockdate'
-							value={endDate}
-							onChange={(e) => handleChange(e, 'lockdate')}
-							className='bg-[#1e4957] border border-[#346b7d] text-white text-sm rounded-lg focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-							placeholder='Select Date and Time'
-							options={{
-								enableTime: true,
-								altInput: true,
-								altFormat: 'F j, Y h:i K',
-								dateFormat: 'Y-m-d H:i:S',
-							}}
-							required
-						/>
-					</div>
-					<div className='mb-5 mt-6'>
-						<input
-							type='submit'
-							id='submit'
-							onClick={(e) => {
-								onClickPreventDefault(e);
-								doVesting();
-							}}
-							className='bg-gradient-to-t from-[#1e4553] to-[#103642] border border-[#33788f] text-white uppercase text-base rounded-lg font-bold cursor-pointer focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
-							disabled={!publicKey}
-						/>
-					</div>
-				</form>
-				{/* <button className='border' onClick={() => testDBSubmission()}>
+						<div className='mb-5 mt-6'>
+							<input
+								type='submit'
+								id='submit'
+								onClick={(e) => {
+									onClickPreventDefault(e);
+									doVesting();
+								}}
+								className='bg-gradient-to-t from-[#1e4553] to-[#103642] border border-[#33788f] text-white uppercase text-base rounded-lg font-bold cursor-pointer focus:ring-blue-500 focus:border-blue-500 block w-full p-2.5'
+								disabled={!publicKey}
+							/>
+						</div>
+					</form>
+					{/* <button className='border' onClick={() => testDBSubmission()}>
 					Test DB Submisson
 				</button> */}
+				</div>
 			</div>
 			<div className='flex-col space-y-5 grow-0'>
 				<div className='grow-0 flex-none rounded-xl bg-[#092E3A] p-7 flex flex-col space-y-5 lg:mx-0 mx-5'>
 					<Details
 						lockInfo={lockInfo.lockName}
-						lockToken={lockInfo.token}
-						lockOwner={lockInfo.owner}
+						lockToken={selectedToken}
+						lockOwner={recipientAddress}
 						lockDate={lockInfo.endDate}
 						lockAmount={selectedTokenAmount}
 					/>
