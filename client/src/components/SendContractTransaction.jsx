@@ -46,7 +46,6 @@ import {
 import { BN } from 'bn.js';
 
 import { createClient } from '@supabase/supabase-js';
-import { use } from 'chai';
 
 const supabase = createClient(
 	'https://ipudikgouqovvhvvwege.supabase.co',
