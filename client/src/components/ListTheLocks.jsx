@@ -50,6 +50,7 @@ const ListTheLocks = () => {
 	const [loadedProvider, setLoadedProvider] = useState(null);
 	const [tokensWithMetadata, setTokensWithMetadata] = useState([]);
 	const [metadata, setMetadata] = useState([]);
+	const [endTimeTemp, setEndTimeTemp] = useState();
 
 	const { networkConfiguration } = useNetworkConfiguration();
 	const network = networkConfiguration;
@@ -150,29 +151,53 @@ const ListTheLocks = () => {
 		formatEndDates();
 	}, [locks]);
 
+	async function getUsrData(address) {
+		let theaddy = new PublicKey(address);
+		try {
+			const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
+				[anchor.utils.bytes.utf8.encode('user-stats'), theaddy.toBuffer()],
+				program.programId
+			);
+
+			const account = await program.account.userStats.fetch(userStatsPDA);
+
+			console.log('Vesting Info:', account.vestList[0].endTs.toString());
+			setEndTimeTemp(account.vestList[0].endTs);
+			// Now you have the vesting info, you can use it as needed
+		} catch (error) {
+			console.error('Error getting user data:', error.message);
+			// Handle error
+		}
+	}
+
+	getUsrData('DuShUrRC7HHFFZn3TJvietVtZ9Nn4RzzviYy2ho38E4D');
+	console.log('user stats pull ran');
+
 	async function handleUnlock(
 		id,
 		mintaddress,
 		recipientaddress,
 		baseAccountAddress,
 		pdaAddress,
-		vaultAddress
+		vaultAddress,
+		amount
 	) {
 		// console.log('BASE??', baseAccountAddress);
-		// console.log('RECP??', pdaAddress);
-		// console.log('MINT??', vaultAddress);
+		console.log('imported pda', pdaAddress);
+		console.log('imported vault', vaultAddress);
 
 		let mint = new PublicKey(mintaddress);
 		let recipient = new PublicKey(recipientaddress);
-		// console.log('baseAccountAddress', baseAccountAddress);
-		// let baseAccount = new PublicKey(baseAccountAddress);
+		let vaultPDA = new PublicKey(vaultAddress);
+
+		console.log('imported recipient', recipient);
+
+		let baseAccount = new PublicKey(baseAccountAddress);
 		// let userStatsPDA = new PublicKey(pdaAddress);
 		// let vaultPDA = new PublicKey(vaultAddress);
-		const baseAccount = anchor.web3.Keypair.generate();
-
-		console.log('old genreeated base', baseAccount);
-		console.log('old genreeated vault', vaultAddress);
-		console.log('old genreeated pda', pdaAddress);
+		// const baseAccount = anchor.web3.Keypair.generate();
+		console.log('passed in baseAccountAddress', baseAccountAddress);
+		console.log('now active base', baseAccount);
 
 		try {
 			// Function to unlock tokens
@@ -190,10 +215,10 @@ const ListTheLocks = () => {
 			const vestList = account.vestList;
 
 			const [vaultPDA, nonce] = PublicKey.findProgramAddressSync(
-				[baseAccount.publicKey.toBuffer()],
+				[baseAccount.toBuffer()],
 				program.programId
 			);
-			console.log('new genreeated vault', vaultPDA.toString(), vaultPDA);
+			console.log('new genreeated vault', vaultPDA.toString());
 
 			const recipientToken = await getOrCreateAssociatedTokenAccount(
 				connection,
@@ -204,20 +229,25 @@ const ListTheLocks = () => {
 
 			console.log(
 				'new genreeated recipientTOken',
-				recipientToken.address.toString()
+				recipientToken.address.toString(),
+				'amount',
+				amount
 			);
 
 			const tx = await program.methods
-				.unlock(vestList.length - 1, new BN(10 * anchor.web3.LAMPORTS_PER_SOL))
+				.unlock(
+					vestList.length - 1,
+					new BN(amount * anchor.web3.LAMPORTS_PER_SOL)
+				)
 				.accounts({
 					user: loadedProvider.wallet.publicKey,
 					userStats: userStatsPDA,
 					recipientToken: recipientToken.address,
 					mint: mint,
-					vault: recipientToken.address,
+					vault: vaultPDA,
 					clock: anchor.web3.SYSVAR_CLOCK_PUBKEY,
 					tokenProgram: TOKEN_PROGRAM_ID,
-					baseAccount: baseAccount.publicKey,
+					baseAccount: baseAccount,
 				})
 				.signers([])
 				.rpc();
@@ -283,7 +313,8 @@ const ListTheLocks = () => {
 												lock.owner,
 												lock.baseAccount,
 												lock.userStatsPDA,
-												lock.vaultPDA
+												lock.vaultPDA,
+												lock.amount
 											)
 										}
 									>

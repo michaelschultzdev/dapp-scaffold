@@ -31,6 +31,7 @@ import Flatpickr from 'react-flatpickr';
 import 'flatpickr/dist/themes/material_green.css';
 import idl from '../idl/token_locker.json';
 import * as anchor from '@project-serum/anchor';
+import { useRouter } from 'next/router';
 import {
 	Program,
 	setProvider,
@@ -51,6 +52,8 @@ const supabase = createClient(
 	'https://ipudikgouqovvhvvwege.supabase.co',
 	'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6ImlwdWRpa2dvdXFvdnZodnZ3ZWdlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3MDk0NjkxMDUsImV4cCI6MjAyNTA0NTEwNX0.P9BLA8DB-fYzIanWDr92Pfwt5wyKMzgxdDeKu7731x0'
 );
+
+let genBase = anchor.web3.Keypair.generate();
 
 const SendContractTransaction = () => {
 	function truncate(str) {
@@ -73,9 +76,7 @@ const SendContractTransaction = () => {
 	const [startDate, setStartDate] = useState(new Date().toISOString());
 	const [tokensWithMetadata, setTokensWithMetadata] = useState([]);
 	const [recipientAddress, setRecipientAddress] = useState('');
-	const [baseAccount, setBaseAccount] = useState(
-		new PublicKey('CLaSKXbuMp1BXTya62WDyZoPvgmfcqsdA18rAjBcn9Vw')
-	);
+	const [baseAccount, setBaseAccount] = useState(genBase);
 
 	const [mintAddressPubKey, setMintAddressPubKey] = useState(
 		new PublicKey('CLaSKXbuMp1BXTya62WDyZoPvgmfcqsdA18rAjBcn9Vw') // set to the SolFi token address bc I can't think of any other
@@ -105,6 +106,7 @@ const SendContractTransaction = () => {
 	const endpoint = useMemo(() => clusterApiUrl(network), [network]);
 	const connection = useMemo(() => new Connection(endpoint), [endpoint]);
 	const programID = new PublicKey(idl.metadata.address);
+	const router = useRouter();
 
 	// Prevent form submission refresh
 	function formPreventDefault(e) {
@@ -124,9 +126,9 @@ const SendContractTransaction = () => {
 
 	useEffect(() => {
 		if (!loadedProvider) return;
-		let genBase = anchor.web3.Keypair.generate();
-		setBaseAccount(genBase);
-		console.log('BASE ACCOUNT:', baseAccount.publicKey.toString());
+		if (genBase) {
+			setBaseAccount(genBase);
+		}
 	}, [loadedProvider]);
 
 	const provider = new AnchorProvider(connection, wallet, {
@@ -159,11 +161,9 @@ const SendContractTransaction = () => {
 
 		setLockInfo((prevState) => ({
 			...prevState,
-			baseAccount: baseAccount,
+			baseAccount: baseAccount?.publicKey?.toString(),
 		}));
-
-		console.log('BASE ACCOUNT USEEFFECTED INTO THE LOCK INFO:', lockInfo);
-	}, []);
+	}, [loadedProvider, baseAccount]);
 
 	useEffect(() => {
 		async function fetchMetadata() {
@@ -363,6 +363,39 @@ const SendContractTransaction = () => {
 	// 	notify({ type: 'success', message: `Lock stored successfully!` });
 	// }
 
+	useEffect(() => {
+		if (!loadedProvider) return;
+
+		async function fetchAuxData() {
+			console.log(
+				'getting base account in fetchdata',
+				baseAccount.publicKey.toString()
+			);
+
+			const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
+				[
+					anchor.utils.bytes.utf8.encode('user-stats'),
+					loadedProvider.wallet.publicKey.toBuffer(),
+				],
+				program.programId
+			);
+
+			const [vaultPDA, nonce] = PublicKey.findProgramAddressSync(
+				[baseAccount.publicKey.toBuffer()],
+				program.programId
+			);
+
+			// Update lockInfo with userStatsPDA and vaultPDA
+			setLockInfo((prevState) => ({
+				...prevState,
+				userStatsPDA: userStatsPDA.toString(),
+				vaultPDA: vaultPDA.toString(),
+			}));
+		}
+
+		fetchAuxData();
+	}, [loadedProvider, baseAccount]);
+
 	async function doVesting() {
 		if (!mintAddressPubKey) {
 			notify({ type: 'error', message: `You must select a token to lock!` });
@@ -494,7 +527,7 @@ const SendContractTransaction = () => {
 			// Handle the error as per your requirements, for example:
 			// notify({ type: 'error', message: 'Error creating user stats' });
 		}
-
+		console.log('baseAccounBeingSubmitted', baseAccount.publicKey.toString());
 		const transac = await program.methods
 			.createVesting(
 				new BN(selectedTokenAmount * anchor.web3.LAMPORTS_PER_SOL),
@@ -522,6 +555,10 @@ const SendContractTransaction = () => {
 			.rpc();
 
 		console.log('done!!');
+		console.log(
+			'baseAccount After Database Call',
+			baseAccount.publicKey.toString()
+		);
 
 		try {
 			const { data, error } = await supabase
