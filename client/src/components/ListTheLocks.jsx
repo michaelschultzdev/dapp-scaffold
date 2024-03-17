@@ -151,28 +151,6 @@ const ListTheLocks = () => {
 		formatEndDates();
 	}, [locks]);
 
-	async function getUsrData(address) {
-		let theaddy = new PublicKey(address);
-		try {
-			const [userStatsPDA, _] = PublicKey.findProgramAddressSync(
-				[anchor.utils.bytes.utf8.encode('user-stats'), theaddy.toBuffer()],
-				program.programId
-			);
-
-			const account = await program.account.userStats.fetch(userStatsPDA);
-
-			console.log('Vesting Info:', account.vestList[0].endTs.toString());
-			setEndTimeTemp(account.vestList[0].endTs);
-			// Now you have the vesting info, you can use it as needed
-		} catch (error) {
-			console.error('Error getting user data:', error.message);
-			// Handle error
-		}
-	}
-
-	getUsrData('DuShUrRC7HHFFZn3TJvietVtZ9Nn4RzzviYy2ho38E4D');
-	console.log('user stats pull ran');
-
 	async function handleUnlock(
 		id,
 		mintaddress,
@@ -209,29 +187,17 @@ const ListTheLocks = () => {
 				program.programId
 			);
 
-			console.log('new genreeated pda', userStatsPDA.toString());
-
 			const account = await program.account.userStats.fetch(userStatsPDA);
 			const vestList = account.vestList;
-
 			const [vaultPDA, nonce] = PublicKey.findProgramAddressSync(
 				[baseAccount.toBuffer()],
 				program.programId
 			);
-			console.log('new genreeated vault', vaultPDA.toString());
-
 			const recipientToken = await getOrCreateAssociatedTokenAccount(
 				connection,
-				loadedProvider.wallet.publicKey,
+				provider.wallet.publicKey,
 				mint,
 				recipient
-			);
-
-			console.log(
-				'new genreeated recipientTOken',
-				recipientToken.address.toString(),
-				'amount',
-				amount
 			);
 
 			const tx = await program.methods
