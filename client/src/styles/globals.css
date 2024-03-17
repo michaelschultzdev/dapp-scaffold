@@ -34,3 +34,17 @@ a {
 .items-center.drawer-content.flex.flex-col.justify-between > div {
 	width: 100%;
 }
+@media only screen and (max-device-width: 1000px) {
+	.adjustheight {
+		margin-left: 10px;
+	}
+	.adjustheight > div.wallet-adapter-dropdown > button,
+	.adjustheight li {
+		line-height: 25px;
+	}
+}
+
+.menu li > :where(a:active),
+.menu li > :where(button:active) {
+	background-color: #062a36;
+}

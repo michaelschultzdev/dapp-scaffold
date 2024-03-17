@@ -274,17 +274,17 @@ const ListTheLocks = () => {
 	}
 
 	return (
-		<div className='flex lg:flex-row flex-col lg:space-x-5 lg:space-y-0 space-y-5 mt-5 min-w-7xl max-w-7xl mx-auto'>
-			<div className='grow-1 rounded-xl bg-[#092E3A] p-7 lg:mx-0 mx-5 text-left w-full'>
+		<div className='flex lg:flex-row flex-col lg:space-x-5 lg:space-y-0 space-y-5 mt-5 min-w-7xl max-w-7xl sm:mx-auto mx-5'>
+			<div className='grow-1 rounded-xl bg-[#092E3A] p-7 lg:mx-0 mx-0 text-left w-full'>
 				<h2 className='text-2xl text-white pb-0 mb-0'>All LP / Token Locks</h2>
 				<hr className='border-[#1e4957] pb-1 mt-5' />
 
-				<div className='mb-10 mt-5'>
+				<div className='mb-0 lg:mb-0 mt-5'>
 					<ul role='list' className='divide-y divide-[#396874]'>
 						{locks.map((lock, index) => (
 							<li
 								key={lock.id}
-								className='flex justify-between gap-x-6 py-5 hover:bg-[#0c1b1e] px-2 rounded'
+								className='flex sm:flex-row flex-col justify-between gap-y-5 sm:gap-y-0 gap-x-6 py-5 hover:bg-[#0c1b1e] px-2 rounded'
 							>
 								<div className='flex min-w-0 gap-x-4'>
 									{/* <img
@@ -301,14 +301,16 @@ const ListTheLocks = () => {
 										</p>
 									</div>
 								</div>
-								<div className='hidden shrink-0 sm:flex sm:flex-col sm:items-end'>
-									<p className='text-sm leading-6 text-white'>{lock.owner}</p>
+								<div className='shrink-0 sm:flex sm:flex-col sm:items-end'>
+									<p className='text-sm leading-6 text-white'>
+										{truncate(lock.owner)}
+									</p>
 									<p className='mt-1 text-xs leading-5 text-gray-100'>
 										Total Locked: {lock.amount} - Unlock Date:{' '}
 										{formattedEndDates[index]}
 									</p>
 									<div
-										className=' cursor-pointer mt-3 flex items-center gap-x-1.5 bg-[#1d4e5a] rounded px-2 py-1'
+										className=' text-center sm:text-left justify-center cursor-pointer mt-3 flex items-center gap-x-1.5 bg-[#1d4e5a] rounded px-2 py-1'
 										onClick={() =>
 											handleUnlock(
 												lock.id,

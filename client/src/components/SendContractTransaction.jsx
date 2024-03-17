@@ -677,7 +677,7 @@ const SendContractTransaction = () => {
 									onClick={handleMaxAmount}
 									className=' text-sm uppercase font-bold ml-2 tecen bg-[#14333d] border border-[#317186] text-white rounded-lg focus:ring-[#4096b3] focus:border-[#5fafc9] w-28 text-center py-2.5 px-2.5'
 								>
-									use max
+									<span className='hidden sm:block'>use</span> max
 								</a>
 							</div>
 						</div>

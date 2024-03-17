@@ -23,7 +23,7 @@ export const AppBar: React.FC = () => {
 			{/* NavBar / Header */}
 			<div className='navbar flex h-auto flex-row md:mb-2 shadow-lg bg-[#081316] text-neutral-content border-b border-[#104354] bg-opacity-66'>
 				<div className='navbar-start align-items-center'>
-					<div className='hidden sm:inline w-28 h-auto md:p-2 ml-10'>
+					<div className=' sm:inline w-auto sm:w-28 h-auto md:p-2 sm:ml-10 ml-2'>
 						<Link
 							href='/'
 							target='_blank'
@@ -34,7 +34,7 @@ export const AppBar: React.FC = () => {
 							<Image src={Logo} width='987' height='318' alt='SolFi' />
 						</Link>
 					</div>
-					<div className='flex md:hidden'>
+					<div className='flex md:hidden adjustheight'>
 						<WalletMultiButtonDynamic className='btn-ghost btn-sm relative flex md:hidden text-lg ' />
 					</div>
 				</div>

@@ -30,7 +30,10 @@ export const ContentContainer: React.FC<Props> = ({ children }) => {
 						<NavElement label='Home' href='/' />
 					</li>
 					<li className='uppercase'>
-						<NavElement label='Basics' href='/basics' />
+						<NavElement label='Locker' href='/locker' />
+					</li>
+					<li className='uppercase'>
+						<NavElement label='List Locks' href='/listlocks' />
 					</li>
 				</ul>
 			</div>
