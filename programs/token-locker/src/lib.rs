@@ -3,6 +3,7 @@ use anchor_spl::{
     associated_token::{self, AssociatedToken, Create},
     token::{self, Mint, Token, TokenAccount, Transfer},
 };
+use solana_program::sysvar::clock::Clock;
 
 declare_id!("ArffnQbDrBUG4zADP9trjUTrsjmmt5n4WFzSrS9gEo5N");
 
@@ -91,7 +92,7 @@ pub mod token_locker {
             let cpi_ctx = CpiContext::new(cpi_program, cpi_accounts);
             token::transfer(cpi_ctx, fee_amount)?;
         }
-        let now = ctx.accounts.clock.unix_timestamp as u64;
+        let now = Clock::get().unwrap().unix_timestamp as u64;
         // // check duration sanity
         if now > start_ts || end_ts <= start_ts {
             return err!(ErrCode::InvalidSchedule);
@@ -154,7 +155,7 @@ pub mod token_locker {
     }
 
     pub fn unlock(ctx: Context<Unlock>, id: u8, amount: u64) -> Result<()> {
-        let now = ctx.accounts.clock.unix_timestamp as u64;
+        let now = Clock::get().unwrap().unix_timestamp as u64;
         let user_stats = &mut ctx.accounts.user_stats;
         let end_ts = user_stats.vest_list[usize::from(id)].end_ts;
 

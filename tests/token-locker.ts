@@ -34,8 +34,8 @@ describe('token-locker', () => {
 	const user: NodeWallet = provider.wallet;
 
 	const DECIMALS = 9;
-	const start = new BN(+new Date() / 1000 + 5);
-	const end = new BN(+new Date() / 1000 + 15);
+	let start = new BN(+new Date() / 1000 + 5);
+	let end = new BN(+new Date() / 1000 + 15);
 
 	const program = anchor.workspace.TokenLocker as Program<TokenLocker>;
 	let mint: PublicKey;
@@ -128,6 +128,9 @@ describe('token-locker', () => {
 			mint,
 			feeAccount.publicKey
 		);
+		
+		start = new BN(+new Date() / 1000 + 5);
+		end = new BN(+new Date() / 1000 + 15);
 		const tx = await program.methods
 			.createVesting(
 				new BN(10 * anchor.web3.LAMPORTS_PER_SOL),
